@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The 108 FBO — Fantasy Baseball</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080d1a; --bg2:#0f1828; --card:#131e30; --card2:#1a2740;
+  --border:rgba(0,200,83,0.15); --border2:rgba(255,255,255,0.07);
+  --green:#00c853; --green2:rgba(0,200,83,0.1);
+  --text:#dce6f5; --muted:#5a6a8a; --accent:#f0c040;
+  --red:#ff5252; --blue:#3b8eea;
+  --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:var(--font)}
+body{background-image:radial-gradient(ellipse at 15% 0%,rgba(0,200,83,.04) 0%,transparent 55%),radial-gradient(ellipse at 85% 100%,rgba(59,142,234,.03) 0%,transparent 55%)}
+
+/* NAV */
+nav{background:rgba(8,13,26,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;padding:0 24px}
+.nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;height:56px;flex-wrap:wrap}
+.nav-brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo{width:36px;height:36px;background:linear-gradient(135deg,#00c853,#00872e);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue';font-size:16px;color:#fff;flex-shrink:0;box-shadow:0 0 16px rgba(0,200,83,.25)}
+.nav-title{font-family:'Bebas Neue';font-size:22px;letter-spacing:1.5px;color:#fff}
+.nav-tabs{display:flex;gap:2px;flex-wrap:wrap}
+.nav-tab{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .15s}
+.nav-tab:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.nav-tab.active{background:var(--green2);color:var(--green);border:1px solid var(--border)}
+.nav-right{display:flex;align-items:center;gap:10px}
+.updated-badge{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--card);border:1px solid var(--border2);padding:4px 10px;border-radius:20px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);animation:blink 2s infinite;display:inline-block;margin-right:5px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* LAYOUT */
+.page{display:none;max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+.page.active{display:block}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.sec-hdr h2{font-family:'Bebas Neue';font-size:26px;letter-spacing:1.5px;color:#fff}
+.sec-hdr::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* STAT STRIP */
+.stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:24px}
+.stat-tile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.stat-val{font-family:'Bebas Neue';font-size:32px;color:var(--green);line-height:1}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* STANDINGS TABLE */
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:460px}
+thead th{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;padding:12px 14px;text-align:left;background:rgba(0,0,0,.2);border-bottom:1px solid var(--border)}
+thead th.c{text-align:center}
+tbody td{padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+tbody td.c{text-align:center;font-family:var(--mono);font-size:12px}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(0,200,83,.025)}
+.rank{font-family:'Bebas Neue';font-size:20px;color:var(--muted)}
+.rank.g{color:var(--accent)}.rank.s{color:#c0c8d8}.rank.b{color:#c88040}
+.team-cell{display:flex;align-items:center;gap:9px}
+.av{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0}
+.tname{font-weight:500;font-size:14px}
+.own{font-size:11px;color:var(--muted)}
+.pct{font-family:var(--mono);color:var(--green);font-weight:600}
+.streak{display:inline-block;padding:2px 7px;border-radius:4px;font-family:var(--mono);font-size:11px;font-weight:500}
+.sw{background:rgba(0,200,83,.12);color:var(--green);border:1px solid rgba(0,200,83,.25)}
+.sl{background:rgba(255,82,82,.1);color:var(--red);border:1px solid rgba(255,82,82,.22)}
+
+/* ROSTER GRID */
+.roster-controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;align-items:flex-end}
+.rc{display:flex;flex-direction:column;gap:4px}
+.rc label{font-size:11px;color:var(--muted)}
+select,input{font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--card);color:var(--text)}
+.roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.rcard{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.rcard.you{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+.rcard-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.rcard-body{padding:4px 0;max-height:280px;overflow-y:auto}
+.player-row{display:flex;align-items:center;gap:7px;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
+.player-row:last-child{border-bottom:none}
+.player-row:hover{background:rgba(255,255,255,.03)}
+.pos-tag{font-size:9px;font-weight:600;padding:2px 5px;border-radius:3px;min-width:26px;text-align:center;flex-shrink:0}
+.pname{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.padp{font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0}
+.status-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sec-sep{font-size:10px;color:var(--muted);padding:5px 14px 2px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)}
+.badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:500}
+.b-il{background:rgba(255,82,82,.12);color:var(--red);border:1px solid rgba(255,82,82,.2)}
+.b-you{background:rgba(59,142,234,.15);color:var(--blue);border:1px solid rgba(59,142,234,.25)}
+.b-adp{background:rgba(0,200,83,.1);color:var(--green);border:1px solid var(--border)}
+
+/* POWER RANKINGS */
+.pr-grid{display:flex;flex-direction:column;gap:10px}
+.pr-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:14px}
+.pr-rank{font-family:'Bebas Neue';font-size:36px;line-height:1;min-width:40px;text-align:center}
+.pr-body{flex:1}
+.pr-name{font-weight:600;font-size:15px}
+.pr-owner{font-size:12px;color:var(--muted)}
+.pr-bars{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.pr-bar-item{display:flex;flex-direction:column;gap:3px;min-width:70px}
+.pr-bar-lbl{font-size:10px;color:var(--muted)}
+.pr-bar-track{height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+.pr-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.pr-score{font-family:'Bebas Neue';font-size:28px;color:var(--accent)}
+.pr-change{font-size:12px;font-family:var(--mono)}
+.pr-up{color:var(--green)}.pr-down{color:var(--red)}.pr-same{color:var(--muted)}
+
+/* MATCHUPS */
+.matchup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.matchup-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px}
+.matchup-teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+.mt-away,.mt-home{display:flex;flex-direction:column}
+.mt-home{align-items:flex-end;text-align:right}
+.mt-name{font-weight:600;font-size:14px}
+.mt-rec{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.mt-vs{text-align:center}
+.mt-score{font-family:'Bebas Neue';font-size:24px;color:var(--accent);line-height:1}
+.mt-wk{font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.matchup-period-sel{margin-bottom:16px}
+
+/* AI TRADE ANALYZER */
+.trade-wrap{max-width:800px}
+.trade-panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:14px}
+.trade-panel h3{font-size:14px;font-weight:600;margin-bottom:14px;color:var(--text)}
+.trade-side{display:grid;grid-template-columns:1fr 60px 1fr;gap:12px;align-items:start;margin-bottom:14px}
+.trade-col h4{font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.trade-vs{display:flex;align-items:center;justify-content:center;padding-top:24px}
+.trade-vs span{font-family:'Bebas Neue';font-size:22px;color:var(--muted)}
+.trade-select-wrap{display:flex;flex-direction:column;gap:6px}
+.trade-player-chip{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-size:13px;cursor:pointer}
+.trade-player-chip:hover{border-color:var(--red)}
+.trade-player-chip .x{color:var(--muted);font-size:16px;margin-left:auto}
+.trade-player-chip .x:hover{color:var(--red)}
+.add-player-row{display:flex;gap:8px;margin-top:6px}
+.add-player-row input{flex:1;font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--bg2);color:var(--text)}
+.suggestions-drop{background:var(--card2);border:1px solid var(--border);border-radius:8px;margin-top:4px;overflow:hidden;display:none;max-height:200px;overflow-y:auto}
+.suggestions-drop.open{display:block}
+.sug-item{padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)}
+.sug-item:hover{background:rgba(0,200,83,.08);color:var(--green)}
+.sug-item:last-child{border-bottom:none}
+.analyze-btn{width:100%;padding:12px;background:var(--green);color:#000;font-weight:700;font-size:14px;border:none;border-radius:10px;cursor:pointer;font-family:var(--font);transition:all .2s}
+.analyze-btn:hover{background:#00a844}
+.analyze-btn:disabled{opacity:.5;cursor:not-allowed}
+.ai-result{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:14px;line-height:1.7;font-size:14px;white-space:pre-wrap;display:none}
+.ai-thinking{display:flex;align-items:center;gap:10px;padding:16px;color:var(--muted);font-size:13px}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* WAIVER */
+.waiver-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.waiver-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.waiver-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.waiver-head h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.waiver-body{padding:6px 0}
+.waiver-player{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.03);font-size:12px}
+.waiver-player:last-child{border-bottom:none}
+.waiver-ai-btn{width:100%;padding:10px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:12px;font-family:var(--font);border-radius:8px;cursor:pointer;margin-top:10px;transition:all .2s}
+.waiver-ai-btn:hover{border-color:var(--green);color:var(--green)}
+
+/* LEAGUE HISTORY */
+.history-empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.history-empty h3{font-size:20px;color:var(--text);margin-bottom:12px;font-family:'Bebas Neue';letter-spacing:1px}
+
+/* UTIL */
+.btn{padding:8px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--card);color:var(--muted);font-family:var(--font);font-size:12px;cursor:pointer;transition:all .2s}
+.btn:hover{border-color:var(--green);color:var(--green)}
+.btn-green{background:var(--green);color:#000;font-weight:700;border-color:var(--green)}
+.btn-green:hover{background:#00a844;color:#000}
+.loading{text-align:center;padding:60px;color:var(--muted)}
+.loading .spinner{margin:0 auto 12px;width:36px;height:36px;border-width:3px}
+.week-sel{margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.week-sel label{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.ai-section{background:linear-gradient(135deg,rgba(0,200,83,.06),rgba(59,142,234,.04));border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:20px}
+.ai-section h3{font-size:14px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ai-section h3::before{content:'🤖';font-size:16px}
+.ai-response{line-height:1.8;font-size:14px;color:var(--text);margin-top:12px;white-space:pre-wrap}
+.empty{color:var(--muted);font-size:13px;padding:20px;text-align:center}
+footer{text-align:center;padding:20px;font-family:var(--mono);font-size:11px;color:var(--muted);border-top:1px solid var(--border2);margin-top:40px}
+@media(max-width:600px){.nav-title{font-size:16px}.nav-tab{padding:5px 10px;font-size:12px}.trade-side{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-brand" href="#">
+      <div class="nav-logo">108</div>
+      <div class="nav-title">The 108 FBO</div>
+    </a>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('standings',this)">Standings</button>
+      <button class="nav-tab" onclick="showPage('rosters',this)">Rosters</button>
+      <button class="nav-tab" onclick="showPage('matchups',this)">Matchups</button>
+      <button class="nav-tab" onclick="showPage('power',this)">Power Rankings</button>
+      <button class="nav-tab" onclick="showPage('trade',this)">Trade Analyzer</button>
+      <button class="nav-tab" onclick="showPage('waiver',this)">Waiver Wire</button>
+      <button class="nav-tab" onclick="showPage('history',this)">League History</button>
+    </div>
+    <div class="nav-right">
+      <div class="updated-badge"><span class="dot"></span><span id="updated-txt">Loading...</span></div>
+    </div>
+  </div>
+</nav>
+
+<!-- STANDINGS -->
+<div id="page-standings" class="page active">
+  <div class="stat-strip" id="standing-stats"></div>
+  <div class="sec-hdr"><h2>League Standings</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:36px">#</th>
+        <th>Team</th>
+        <th class="c">W</th><th class="c">L</th><th class="c">T</th>
+        <th class="c">PCT</th><th class="c">GB</th><th class="c">Streak</th>
+      </tr></thead>
+      <tbody id="standings-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ROSTERS -->
+<div id="page-rosters" class="page">
+  <div class="roster-controls">
+    <div class="rc"><label>Sort by</label>
+      <select onchange="renderRosters()" id="r-sort">
+        <option value="name">Team name</option>
+        <option value="adp">Best active ADP</option>
+        <option value="il">Most IL</option>
+      </select>
+    </div>
+    <div class="rc"><label>Status</label>
+      <select onchange="renderRosters()" id="r-status">
+        <option value="all">All</option>
+        <option value="ACTIVE">Active</option>
+        <option value="RESERVE">Reserve</option>
+        <option value="MINORS">Minors</option>
+        <option value="INJURED_RESERVE">IL</option>
+      </select>
+    </div>
+    <div class="rc"><label>Position</label>
+      <select onchange="renderRosters()" id="r-pos">
+        <option value="all">All</option>
+        <option value="SP">SP</option><option value="RP">RP</option>
+        <option value="C">C</option><option value="1B">1B</option>
+        <option value="2B">2B</option><option value="3B">3B</option>
+        <option value="SS">SS</option><option value="OF">OF</option>
+        <option value="UT">UT</option>
+      </select>
+    </div>
+    <div class="rc"><label>Search player</label>
+      <input type="text" id="r-search" placeholder="Player name..." oninput="renderRosters()" style="width:160px">
+    </div>
+  </div>
+  <div class="roster-grid" id="roster-grid"></div>
+</div>
+
+<!-- MATCHUPS -->
+<div id="page-matchups" class="page">
+  <div class="week-sel">
+    <label>Week</label>
+    <select id="week-sel" onchange="renderMatchups()"></select>
+    <button class="btn btn-green" onclick="getMatchupAnalysis()">🤖 AI Matchup Analysis</button>
+  </div>
+  <div class="matchup-grid" id="matchup-grid"></div>
+  <div class="ai-section" id="matchup-ai" style="display:none">
+    <h3>Matchup Analysis</h3>
+    <div class="ai-response" id="matchup-ai-text"></div>
+  </div>
+</div>
+
+<!-- POWER RANKINGS -->
+<div id="page-power" class="page">
+  <div class="sec-hdr"><h2>Power Rankings</h2></div>
+  <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap">
+    <button class="btn btn-green" onclick="generatePowerRankings()">🤖 Generate AI Power Rankings</button>
+    <div style="font-size:12px;color:var(--muted);align-self:center">Based on roster quality, ADP, and team construction</div>
+  </div>
+  <div id="power-grid" class="pr-grid"></div>
+  <div class="ai-section" id="power-ai" style="display:none">
+    <h3>AI Power Rankings Analysis</h3>
+    <div class="ai-response" id="power-ai-text"></div>
+  </div>
+</div>
+
+<!-- TRADE ANALYZER -->
+<div id="page-trade" class="page">
+  <div class="trade-wrap">
+    <div class="trade-panel">
+      <h3>Trade Analyzer — powered by AI</h3>
+      <div class="trade-side">
+        <div>
+          <h4>You Give</h4>
+          <div class="trade-select-wrap" id="give-chips"></div>
+          <div class="add-player-row">
+            <input type="text" id="give-input" placeholder="Add player..." oninput="searchPlayers('give')" autocomplete="off">
+          </div>
+          <div class="suggestions-drop" id="give-drop"></div>
+        </div>
+        <div class="trade-vs"><span>FOR</span></div>
+        <div>
+          <h4>You Get</h4>
+          <div class="trade-select-wrap" id="get-chips"></div>
+          <div class="add-player-row">
+            <input type="text" id="get-input" placeholder="Add player..." oninput="searchPlayers('get')" autocomplete="off">
+          </div>
+          <div class="suggestions-drop" id="get-drop"></div>
+        </div>
+      </div>
+      <button class="analyze-btn" id="analyze-btn" onclick="analyzeTrade()">🤖 Analyze This Trade</button>
+    </div>
+    <div class="ai-result" id="trade-result"></div>
+  </div>
+</div>
+
+<!-- WAIVER WIRE -->
+<div id="page-waiver" class="page">
+  <div class="sec-hdr"><h2>Waiver Wire Suggestions</h2></div>
+  <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;align-items:center">
+    <label style="font-size:12px;color:var(--muted)">Your team:</label>
+    <select id="waiver-team-sel" style="width:220px"></select>
+    <button class="btn btn-green" onclick="getWaiverSuggestions()">🤖 Get AI Suggestions</button>
+  </div>
+  <div id="waiver-grid"></div>
+  <div class="ai-section" id="waiver-ai" style="display:none">
+    <h3>Waiver Wire Recommendations</h3>
+    <div class="ai-response" id="waiver-ai-text"></div>
+  </div>
+</div>
+
+<!-- LEAGUE HISTORY -->
+<div id="page-history" class="page">
+  <div class="sec-hdr"><h2>League History</h2></div>
+  <div class="history-empty">
+    <h3>History Coming Soon</h3>
+    <p style="max-width:420px;margin:0 auto;line-height:1.7">Fantrax's API doesn't expose historical season data directly. To add your league history, screenshot the League History page in Fantrax and upload it — we'll build a permanent record here.</p>
+    <br>
+    <p style="color:var(--muted);font-size:12px">Go to: Fantrax → Other → League History → Screenshot it and share!</p>
+  </div>
+</div>
+
+<footer>The 108 FBO · 2026 Season · <a href="https://www.fantrax.com/fantasy/league/ai1iqnl9mg6kvw0f/home" target="_blank" style="color:var(--green);text-decoration:none">Open in Fantrax ↗</a></footer>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const TEAM_COLORS = ['#185FA5','#1D9E75','#D85A30','#D4537E','#534AB7','#0F6E56','#BA7517','#639922','#993556','#185FA5','#3C3489','#854F0B'];
+const POS_COLORS = {SP:'#3b82f6',RP:'#8b5cf6',C:'#ec4899','1B':'#f59e0b','2B':'#10b981','3B':'#ef4444',SS:'#06b6d4',OF:'#f97316',UT:'#6366f1',P:'#0ea5e9'};
+const STATUS_COLORS = {ACTIVE:'#22c55e',RESERVE:'#3b8eea',MINORS:'#84cc16',INJURED_RESERVE:'#ef4444'};
+const YOU = 'tbwrxqepmg6kvw0l'; // Rockwall Rhinos
+
+let DATA = null;
+let tradePlayers = {give: [], get: []};
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const r = await fetch('data.json?v=' + Date.now());
+    DATA = await r.json();
+    document.getElementById('updated-txt').textContent = 'Updated ' + DATA.meta.updatedDate;
+    renderStandings();
+    renderRosters();
+    renderMatchups();
+    renderPowerRankings();
+    populateWaiverTeamSel();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('updated-txt').textContent = 'Data unavailable';
+  }
+}
+
+// ─── NAV ───────────────────────────────────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function ini(name) {
+  return (name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+}
+
+// ─── STANDINGS ────────────────────────────────────────────────────────────────
+function renderStandings() {
+  if (!DATA) return;
+  const rows = DATA.standings || [];
+  const tbody = document.getElementById('standings-body');
+  tbody.innerHTML = '';
+
+  const teamsArr = Object.values(DATA.rosters || {});
+  const colorMap = {};
+  teamsArr.forEach((t,i) => colorMap[t.id] = TEAM_COLORS[i % TEAM_COLORS.length]);
+
+  rows.forEach((row, i) => {
+    const name = row.teamName || row.name || '?';
+    const owner = DATA.teams ? Object.values(DATA.teams).find(t => t.name === name)?.owner || '' : '';
+    const pts = row.points || '0-0-0';
+    const [w,l,t2] = pts.split('-').map(Number);
+    const pct = row.winPercentage ? row.winPercentage.toFixed(3) : '.000';
+    const gb = i === 0 ? '—' : (row.gamesBack || '—');
+    const streak = row.streak || '';
+    const tid = row.teamId || '';
+    const color = colorMap[tid] || TEAM_COLORS[i % TEAM_COLORS.length];
+    const rkClass = i===0?'g':i===1?'s':i===2?'b':'';
+    const sHtml = streak ? `<span class="streak ${streak.startsWith('W')?'sw':'sl'}">${streak}</span>` : '—';
+    tbody.innerHTML += `<tr>
+      <td><div class="rank ${rkClass}">${i+1}</div></td>
+      <td><div class="team-cell"><div class="av" style="background:${color}">${ini(name)}</div>
+        <div><div class="tname">${name}</div><div class="own">${owner}</div></div></div></td>
+      <td class="c">${w||0}</td><td class="c">${l||0}</td><td class="c">${t2||0}</td>
+      <td class="c pct">${pct}</td>
+      <td class="c" style="color:var(--muted);font-family:var(--mono);font-size:12px">${gb}</td>
+      <td class="c">${sHtml}</td>
+    </tr>`;
+  });
+
+  document.getElementById('standing-stats').innerHTML = `
+    <div class="stat-tile"><div class="stat-val">${rows.length}</div><div class="stat-lbl">Teams</div></div>
+    <div class="stat-tile"><div class="stat-val">${DATA.meta.season}</div><div class="stat-lbl">Season</div></div>
+    <div class="stat-tile"><div class="stat-val">${DATA.schedule?.length || 0}</div><div class="stat-lbl">Weeks</div></div>
+    <div class="stat-tile"><div class="stat-val">${Object.values(DATA.rosters||{}).reduce((s,t)=>s+t.players.filter(p=>p.status==='INJURED_RESERVE').length,0)}</div><div class="stat-lbl">On IL</div></div>
+  `;
+}
+
+// ─── ROSTERS ─────────────────────────────────────────────────────────────────
+function renderRosters() {
+  if (!DATA) return;
+  const sortBy = document.getElementById('r-sort').value;
+  const statusF = document.getElementById('r-status').value;
+  const posF = document.getElementById('r-pos').value;
+  const search = document.getElementById('r-search').value.toLowerCase();
+
+  let teams = Object.values(DATA.rosters || {});
+
+  const avgAdp = (t) => {
+    const ps = t.players.filter(p => p.status==='ACTIVE' && p.adp < 500);
+    return ps.length ? ps.reduce((s,p)=>s+p.adp,0)/ps.length : 999;
+  };
+
+  if (sortBy === 'adp') teams.sort((a,b) => avgAdp(a)-avgAdp(b));
+  else if (sortBy === 'il') teams.sort((a,b) => b.players.filter(p=>p.status==='INJURED_RESERVE').length - a.players.filter(p=>p.status==='INJURED_RESERVE').length);
+  else teams.sort((a,b) => a.name.localeCompare(b.name));
+
+  const grid = document.getElementById('roster-grid');
+  grid.innerHTML = '';
+
+  teams.forEach((team, ti) => {
+    let players = [...team.players];
+    if (statusF !== 'all') players = players.filter(p => p.status === statusF);
+    if (posF !== 'all') players = players.filter(p => p.pos === posF);
+    if (search) players = players.filter(p => (p.name||'').toLowerCase().includes(search));
+    if (!players.length && (posF !== 'all' || search)) return;
+
+    const color = TEAM_COLORS[ti % TEAM_COLORS.length];
+    const il = team.players.filter(p=>p.status==='INJURED_RESERVE').length;
+    const aAdp = avgAdp(team);
+    const isYou = team.id === YOU;
+
+    const groups = {ACTIVE:[],RESERVE:[],MINORS:[],INJURED_RESERVE:[]};
+    players.forEach(p => { if(groups[p.status]) groups[p.status].push(p); });
+
+    let rows = '';
+    const lbl = {ACTIVE:'Active',RESERVE:'Reserve',MINORS:'Minors',INJURED_RESERVE:'IL'};
+    Object.entries(groups).forEach(([st, ps]) => {
+      if (!ps.length) return;
+      if (statusF === 'all') rows += `<div class="sec-sep">${lbl[st]}</div>`;
+      ps.forEach(p => {
+        const pc = POS_COLORS[p.pos] || '#888';
+        const sc = STATUS_COLORS[p.status] || '#888';
+        const adp = p.adp < 500 ? p.adp.toFixed(1) : '—';
+        rows += `<div class="player-row">
+          <div class="status-dot" style="background:${sc}"></div>
+          <span class="pos-tag" style="background:${pc}22;color:${pc};border:0.5px solid ${pc}44">${p.pos}</span>
+          <span class="pname">${p.name}</span>
+          <span class="padp">${adp}</span>
+        </div>`;
+      });
+    });
+
+    grid.innerHTML += `
+      <div class="rcard${isYou?' you':''}">
+        <div class="rcard-head">
+          <div class="team-cell">
+            <div class="av" style="background:${color}">${ini(team.name)}</div>
+            <div><div class="tname">${team.name}${isYou?' ★':''}</div><div class="own">${team.owner}</div></div>
+          </div>
+          <div style="display:flex;gap:5px">
+            ${isYou?'<span class="badge b-you">You</span>':''}
+            ${il>0?`<span class="badge b-il">${il} IL</span>`:''}
+            ${aAdp<500?`<span class="badge b-adp">ADP ${aAdp.toFixed(0)}</span>`:''}
+          </div>
+        </div>
+        <div class="rcard-body">${rows||'<div class="empty">No players match filters</div>'}</div>
+      </div>`;
+  });
+}
+
+// ─── MATCHUPS ─────────────────────────────────────────────────────────────────
+function renderMatchups() {
+  if (!DATA || !DATA.schedule) return;
+  const sel = document.getElementById('week-sel');
+  if (sel.innerHTML === '') {
+    DATA.schedule.forEach(week => {
+      const opt = document.createElement('option');
+      opt.value = week.period;
+      opt.textContent = `Week ${week.period}`;
+      sel.appendChild(opt);
+    });
+  }
+  const period = parseInt(sel.value) || 1;
+  const week = DATA.schedule.find(w => w.period === period);
+  const grid = document.getElementById('matchup-grid');
+  grid.innerHTML = '';
+  if (!week) return;
+  week.matchupList.forEach((m, i) => {
+    grid.innerHTML += `
+      <div class="matchup-card">
+        <div class="matchup-teams">
+          <div class="mt-away">
+            <div class="mt-name">${m.away.name}</div>
+            <div class="mt-rec">${m.away.shortName}</div>
+          </div>
+          <div class="mt-vs">
+            <div class="mt-score">VS</div>
+            <div class="mt-wk">WEEK ${period}</div>
+          </div>
+          <div class="mt-home">
+            <div class="mt-name">${m.home.name}</div>
+            <div class="mt-rec">${m.home.shortName}</div>
+          </div>
+        </div>
+      </div>`;
+  });
+}
+
+async function getMatchupAnalysis() {
+  if (!DATA) return;
+  const period = parseInt(document.getElementById('week-sel').value) || 1;
+  const week = DATA.schedule.find(w => w.period === period);
+  if (!week) return;
+
+  const aiEl = document.getElementById('matchup-ai');
+  const textEl = document.getElementById('matchup-ai-text');
+  aiEl.style.display = 'block';
+  textEl.innerHTML = '<div class="ai-thinking"><div class="spinner"></div>Analyzing Week ' + period + ' matchups...</div>';
+
+  const matchupSummary = week.matchupList.map(m => {
+    const awayRoster = Object.values(DATA.rosters).find(t => t.id === m.away.id);
+    const homeRoster = Object.values(DATA.rosters).find(t => t.id === m.home.id);
+    const awayTopPlayers = awayRoster?.players.filter(p=>p.status==='ACTIVE').sort((a,b)=>a.adp-b.adp).slice(0,5).map(p=>p.name).join(', ') || '';
+    const homeTopPlayers = homeRoster?.players.filter(p=>p.status==='ACTIVE').sort((a,b)=>a.adp-b.adp).slice(0,5).map(p=>p.name).join(', ') || '';
+    return `${m.away.name} (${awayTopPlayers}) vs ${m.home.name} (${homeTopPlayers})`;
+  }).join('\n');
+
+  const prompt = `You are a fantasy baseball analyst for The 108 FBO league. Analyze these Week ${period} matchups and predict winners with brief reasoning. Be specific, fun, and opinionated. Keep it concise.\n\nMatchups:\n${matchupSummary}`;
+  textEl.textContent = await callClaude(prompt);
+}
+
+// ─── POWER RANKINGS ──────────────────────────────────────────────────────────
+function renderPowerRankings() {
+  if (!DATA) return;
+  const teams = Object.values(DATA.rosters || {});
+
+  // Score each team based on active roster ADP
+  const scored = teams.map((team, i) => {
+    const active = team.players.filter(p => p.status === 'ACTIVE' && p.adp < 500);
+    const avgAdp = active.length ? active.reduce((s,p)=>s+p.adp,0)/active.length : 999;
+    const topAdp = active.length ? Math.min(...active.map(p=>p.adp)) : 999;
+    const ilCount = team.players.filter(p=>p.status==='INJURED_RESERVE').length;
+    const score = Math.round(1000 - avgAdp - (ilCount * 15));
+    const color = TEAM_COLORS[i % TEAM_COLORS.length];
+    return { ...team, avgAdp, topAdp, ilCount, score, color };
+  }).sort((a,b) => b.score - a.score);
+
+  const maxScore = scored[0]?.score || 1;
+  const grid = document.getElementById('power-grid');
+  grid.innerHTML = '';
+
+  scored.forEach((team, i) => {
+    const pct = Math.round((team.score / maxScore) * 100);
+    const rkColor = i===0?'var(--accent)':i<4?'var(--green)':'var(--muted)';
+    grid.innerHTML += `
+      <div class="pr-card${team.id===YOU?' rcard you':''}">
+        <div class="pr-rank" style="color:${rkColor}">${i+1}</div>
+        <div class="pr-body">
+          <div class="pr-name">${team.name}${team.id===YOU?' ★':''}</div>
+          <div class="pr-owner">${team.owner}</div>
+          <div class="pr-bars">
+            <div class="pr-bar-item">
+              <div class="pr-bar-lbl">Roster Quality</div>
+              <div class="pr-bar-track"><div class="pr-bar-fill" style="width:${pct}%;background:${team.color}"></div></div>
+            </div>
+            <div class="pr-bar-item">
+              <div class="pr-bar-lbl">Avg Active ADP: ${team.avgAdp.toFixed(0)}</div>
+              <div class="pr-bar-track"><div class="pr-bar-fill" style="width:${Math.round((1-(team.avgAdp/500))*100)}%;background:var(--green)"></div></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="pr-score">${team.score}</div>
+          ${team.ilCount>0?`<div style="font-size:11px;color:var(--red);font-family:var(--mono);text-align:center">${team.ilCount} IL</div>`:''}
+        </div>
+      </div>`;
+  });
+}
+
+async function generatePowerRankings() {
+  if (!DATA) return;
+  const aiEl = document.getElementById('power-ai');
+  const textEl = document.getElementById('power-ai-text');
+  aiEl.style.display = 'block';
+  textEl.innerHTML = '<div class="ai-thinking"><div class="spinner"></div>Generating power rankings...</div>';
+
+  const teamSummaries = Object.values(DATA.rosters).map(team => {
+    const active = team.players.filter(p=>p.status==='ACTIVE').sort((a,b)=>a.adp-b.adp);
+    const il = team.players.filter(p=>p.status==='INJURED_RESERVE');
+    const top5 = active.slice(0,5).map(p=>`${p.name}(${p.pos},ADP:${p.adp})`).join(', ');
+    return `${team.name}(${team.owner}): Top players: ${top5}. IL: ${il.map(p=>p.name).join(', ')||'none'}`;
+  }).join('\n');
+
+  const prompt = `You are a fantasy baseball analyst for The 108 FBO league (2026 season). Based on these rosters, write detailed power rankings with analysis. Be bold, funny, and opinionated. Rank all 12 teams and give each a nickname or label (e.g. "The Juggernaut", "Sleeper Pick", "Dumpster Fire"). Keep it fun for a friend group.\n\nRosters:\n${teamSummaries}`;
+  textEl.textContent = await callClaude(prompt);
+}
+
+// ─── TRADE ANALYZER ──────────────────────────────────────────────────────────
+function searchPlayers(side) {
+  const input = document.getElementById(side + '-input').value.toLowerCase();
+  const drop = document.getElementById(side + '-drop');
+  if (!input || input.length < 2 || !DATA) { drop.classList.remove('open'); return; }
+
+  const allPlayers = [];
+  Object.values(DATA.rosters).forEach(team => {
+    team.players.forEach(p => {
+      if ((p.name||'').toLowerCase().includes(input)) {
+        allPlayers.push({ ...p, teamName: team.name });
+      }
+    });
+  });
+
+  if (!allPlayers.length) { drop.classList.remove('open'); return; }
+  drop.innerHTML = allPlayers.slice(0,8).map(p =>
+    `<div class="sug-item" onclick="addTradePlayer('${side}','${p.name}','${p.pos}',${p.adp},'${p.teamName}')">${p.name} <span style="color:var(--muted);font-size:11px">${p.pos} · ${p.teamName} · ADP ${p.adp<500?p.adp.toFixed(1):'?'}</span></div>`
+  ).join('');
+  drop.classList.add('open');
+}
+
+function addTradePlayer(side, name, pos, adp, team) {
+  tradePlayers[side].push({ name, pos, adp, team });
+  document.getElementById(side + '-input').value = '';
+  document.getElementById(side + '-drop').classList.remove('open');
+  renderTradeChips(side);
+}
+
+function removeTradePlayer(side, idx) {
+  tradePlayers[side].splice(idx, 1);
+  renderTradeChips(side);
+}
+
+function renderTradeChips(side) {
+  const container = document.getElementById(side + '-chips');
+  container.innerHTML = tradePlayers[side].map((p, i) =>
+    `<div class="trade-player-chip">
+      <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:${(POS_COLORS[p.pos]||'#888')}22;color:${POS_COLORS[p.pos]||'#888'}">${p.pos}</span>
+      <span>${p.name}</span>
+      <span style="font-size:10px;color:var(--muted)">${p.adp<500?'ADP '+p.adp.toFixed(1):''}</span>
+      <span class="x" onclick="removeTradePlayer('${side}',${i})">×</span>
+    </div>`
+  ).join('');
+}
+
+async function analyzeTrade() {
+  if (!tradePlayers.give.length || !tradePlayers.get.length) {
+    alert('Add at least one player to each side!'); return;
+  }
+  const btn = document.getElementById('analyze-btn');
+  const result = document.getElementById('trade-result');
+  btn.disabled = true;
+  btn.textContent = '⏳ Analyzing...';
+  result.style.display = 'block';
+  result.innerHTML = '<div class="ai-thinking"><div class="spinner"></div>Analyzing trade...</div>';
+
+  const myRoster = DATA.rosters[YOU];
+  const myTop = myRoster?.players.filter(p=>p.status==='ACTIVE').sort((a,b)=>a.adp-b.adp).slice(0,10).map(p=>`${p.name}(${p.pos})`).join(', ');
+
+  const give = tradePlayers.give.map(p=>`${p.name}(${p.pos},ADP:${p.adp<500?p.adp.toFixed(1):'?'},Team:${p.team})`).join(', ');
+  const get  = tradePlayers.get.map(p=>`${p.name}(${p.pos},ADP:${p.adp<500?p.adp.toFixed(1):'?'},Team:${p.team})`).join(', ');
+
+  const prompt = `You are a fantasy baseball analyst. Evaluate this trade for the Rockwall Rhinos (managed by Jacob) in The 108 FBO league.\n\nMy current active roster: ${myTop}\n\nTrade: I GIVE: ${give}\nI GET: ${get}\n\nAnalyze:\n1. Fair value assessment (who wins the trade)\n2. Impact on my team's needs\n3. Final verdict: Accept, Decline, or Counter-offer\n\nBe specific and direct. Use ADP as a baseline but consider positional scarcity and team needs.`;
+
+  result.textContent = await callClaude(prompt);
+  btn.disabled = false;
+  btn.textContent = '🤖 Analyze This Trade';
+}
+
+// ─── WAIVER WIRE ─────────────────────────────────────────────────────────────
+function populateWaiverTeamSel() {
+  const sel = document.getElementById('waiver-team-sel');
+  Object.values(DATA.rosters||{}).forEach(team => {
+    const opt = document.createElement('option');
+    opt.value = team.id;
+    opt.textContent = `${team.name} (${team.owner})`;
+    if (team.id === YOU) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+async function getWaiverSuggestions() {
+  if (!DATA) return;
+  const teamId = document.getElementById('waiver-team-sel').value;
+  const team = DATA.rosters[teamId];
+  if (!team) return;
+
+  const aiEl = document.getElementById('waiver-ai');
+  const textEl = document.getElementById('waiver-ai-text');
+  aiEl.style.display = 'block';
+  textEl.innerHTML = '<div class="ai-thinking"><div class="spinner"></div>Finding best pickups...</div>';
+
+  // Find all rostered player IDs
+  const rosteredIds = new Set();
+  Object.values(DATA.rosters).forEach(t => t.players.forEach(p => rosteredIds.add(p.id)));
+
+  // Find available players from playerMap
+  const available = Object.entries(DATA.playerMap || {})
+    .filter(([id]) => !rosteredIds.has(id))
+    .map(([id, p]) => ({ id, ...p }))
+    .filter(p => p.adp && p.adp < 300)
+    .sort((a,b) => a.adp - b.adp)
+    .slice(0, 30);
+
+  const myRoster = team.players.filter(p=>p.status==='ACTIVE').sort((a,b)=>a.adp-b.adp).slice(0,12).map(p=>`${p.name}(${p.pos})`).join(', ');
+  const weakLinks = team.players.filter(p=>p.status==='ACTIVE' && p.adp>300).map(p=>`${p.name}(${p.pos},ADP:${p.adp})`).join(', ');
+  const availStr = available.slice(0,20).map(p=>`${p.name}(${p.pos},ADP:${p.adp.toFixed(1)})`).join(', ');
+
+  const prompt = `Fantasy baseball waiver wire advice for ${team.name} (${team.owner}) in The 108 FBO.\n\nCurrent active roster: ${myRoster}\nWeakest links (high ADP = worse): ${weakLinks||'none obvious'}\nTop available free agents: ${availStr}\n\nGive top 5 pickup recommendations with who to drop. Be specific and direct.`;
+  textEl.textContent = await callClaude(prompt);
+}
+
+// ─── CLAUDE API ───────────────────────────────────────────────────────────────
+async function callClaude(prompt) {
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: CLAUDE_MODEL,
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const d = await r.json();
+    return d.content?.[0]?.text || 'No response received.';
+  } catch(e) {
+    return `Error: ${e.message}`;
+  }
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#give-input')) document.getElementById('give-drop').classList.remove('open');
+  if (!e.target.closest('#get-input')) document.getElementById('get-drop').classList.remove('open');
+});
+
+init();
+</script>
+</body>
+</html>
