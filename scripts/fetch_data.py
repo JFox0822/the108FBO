@@ -103,10 +103,27 @@ else:
     rows = []
 for row in rows:
     if not isinstance(row, dict): continue
+    # Try multiple field name formats that Fantrax API might use
+    record = row.get('record') or row.get('points') or '0-0-0'
+    w = row.get('wins') or row.get('w') or 0
+    l = row.get('losses') or row.get('l') or 0
+    t = row.get('ties') or row.get('t') or 0
+    # If record string provided, parse it
+    if isinstance(record, str) and '-' in record:
+        parts = record.split('-')
+        if len(parts) >= 2:
+            try:
+                w = int(parts[0])
+                l = int(parts[1])
+                t = int(parts[2]) if len(parts) > 2 else 0
+            except: pass
     standings.append({
         'teamId':        row.get('teamId', ''),
         'teamName':      row.get('teamName', ''),
-        'points':        row.get('record', '0-0-0'),
+        'points':        f'{w}-{l}-{t}',
+        'wins':          w,
+        'losses':        l,
+        'ties':          t,
         'winPercentage': row.get('winPercentage', 0),
         'gamesBack':     row.get('gamesBack', 0),
         'streak':        row.get('streak', ''),
