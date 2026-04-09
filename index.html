@@ -110,11 +110,11 @@ body::before {
 .nav-tabs::-webkit-scrollbar { display: none; }
 .ntab {
   flex-shrink: 0; white-space: nowrap;
-  padding: 8px 16px; border-radius: 8px;
+  padding: 8px 14px; border-radius: 8px;
   border: 1px solid transparent; background: transparent;
   color: var(--text3); font-size: 13px; font-weight: 500;
   transition: all .15s; cursor: pointer; min-height: 36px;
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: 5px;
 }
 .ntab:hover { color: var(--text); background: rgba(255,255,255,.05); border-color: var(--border); }
 .ntab.active {
@@ -123,6 +123,13 @@ body::before {
   border: 1px solid rgba(0,230,118,.3);
   font-weight: 600;
 }
+.tab-num {
+  font-size: 9px; font-family: var(--mono); color: var(--text3);
+  background: rgba(255,255,255,.07); border-radius: 3px;
+  padding: 1px 4px; min-width: 16px; text-align: center;
+  flex-shrink: 0;
+}
+.ntab.active .tab-num { background: rgba(0,230,118,.15); color: var(--green); }
 .nav-updated {
   flex-shrink: 0; display: none; align-items: center; gap: 6px;
   font-family: var(--mono); font-size: 10px; color: var(--text3);
@@ -799,23 +806,24 @@ select:focus, input:focus {
       <div class="nav-title">THE 108 FBO</div>
     </a>
     <div class="nav-tabs">
-      <button class="ntab active" data-page="standings">Standings</button>
-      <button class="ntab" data-page="rosters">Rosters</button>
-      <button class="ntab" data-page="matchups">Matchups</button>
-      <button class="ntab" data-page="power">Power Rankings</button>
-      <button class="ntab" data-page="legacy">Legacy</button>
-      <button class="ntab" data-page="waiver">Waiver Wire</button>
-      <button class="ntab" data-page="trade">Trade Analyzer</button>
-      <button class="ntab" data-page="awards">Awards</button>
-      <button class="ntab" data-page="articles">Articles</button>
-      <button class="ntab" data-page="resumes">Resumes</button>
-      <button class="ntab" data-page="championships">Championships</button>
-      <button class="ntab" data-page="records">Records</button>
-      <button class="ntab" data-page="h2h">H2H</button>
-      <button class="ntab" data-page="luck">Luck Index</button>
-      <button class="ntab" data-page="stats">All-Time Stats</button>
-      <button class="ntab" data-page="outliers">Outliers</button>
-      <button class="ntab" data-page="catking">Cat Kings</button>
+      <button class="ntab active" data-page="standings"><span class="tab-num">1</span>Standings</button>
+      <button class="ntab" data-page="matchups"><span class="tab-num">2</span>Matchups</button>
+      <button class="ntab" data-page="rosters"><span class="tab-num">3</span>Rosters</button>
+      <button class="ntab" data-page="power"><span class="tab-num">4</span>Power Rankings</button>
+      <button class="ntab" data-page="legacy"><span class="tab-num">5</span>Legacy</button>
+      <button class="ntab" data-page="waiver"><span class="tab-num">6</span>Waiver Wire</button>
+      <button class="ntab" data-page="trade"><span class="tab-num">7</span>Trade Analyzer</button>
+      <button class="ntab" data-page="awards"><span class="tab-num">8</span>Awards</button>
+      <button class="ntab" data-page="articles"><span class="tab-num">9</span>Articles</button>
+      <button class="ntab" data-page="resumes"><span class="tab-num">10</span>Resumes</button>
+      <button class="ntab" data-page="championships"><span class="tab-num">11</span>Championships</button>
+      <button class="ntab" data-page="records"><span class="tab-num">12</span>Records</button>
+      <button class="ntab" data-page="h2h"><span class="tab-num">13</span>H2H</button>
+      <button class="ntab" data-page="luck"><span class="tab-num">14</span>Luck Index</button>
+      <button class="ntab" data-page="stats"><span class="tab-num">15</span>All-Time Stats</button>
+      <button class="ntab" data-page="outliers"><span class="tab-num">16</span>Outliers</button>
+      <button class="ntab" data-page="catking"><span class="tab-num">17</span>Cat Kings</button>
+      <button class="ntab" data-page="koh"><span class="tab-num">18</span>King of the Hill</button>
     </div>
     <div class="nav-updated">
       <div class="live-dot"></div>
@@ -1118,6 +1126,7 @@ select:focus, input:focus {
     <div class="filter-item">
       <label>Season</label>
       <select id="luck-year" onchange="renderLuck()">
+        <option value="2026">2026 (Current)</option>
         <option value="2025">2025</option>
         <option value="2024">2024</option>
       </select>
@@ -1144,6 +1153,7 @@ select:focus, input:focus {
     <div class="filter-item">
       <label>Season</label>
       <select id="stats-year" onchange="renderStats()">
+        <option value="2026">2026 (Current)</option>
         <option value="2025">2025</option>
         <option value="2024">2024</option>
       </select>
@@ -1187,6 +1197,30 @@ select:focus, input:focus {
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════
+     KING OF THE HILL
+     ═══════════════════════════════════════════════ -->
+<div id="page-koh" class="page">
+  <div class="section-header"><h2>King of the Hill</h2><div class="sh-line"></div></div>
+  <div style="font-size:13px;color:var(--text3);margin-bottom:4px;line-height:1.6">
+    Every team starts alive. Each week, the team with the <b style="color:var(--red)">fewest category wins</b> is eliminated.
+    Ties = both teams eliminated. Last team standing wins — then it resets.
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">
+    <div class="filter-item">
+      <label>Season</label>
+      <select id="koh-season" onchange="renderKOH()">
+        <option value="2026">2026 (Current)</option>
+        <option value="2025">2025</option>
+        <option value="2024">2024</option>
+      </select>
+    </div>
+  </div>
+  <div id="koh-container">
+    <div class="loading-state"><div class="loading-spinner"></div></div>
+  </div>
+</div>
+
 <!-- ── BOTTOM NAV ── -->
 <div id="mobile-nav-wrap">
   <select id="mobile-nav-select" onchange="goMobile(this.value)">
@@ -1207,6 +1241,7 @@ select:focus, input:focus {
     <option value="stats">📊 All-Time Stats</option>
     <option value="outliers">🔥 Outliers</option>
     <option value="catking">👑 Category Kings</option>
+    <option value="koh">🤴 King of the Hill</option>
   </select>
 </div>
 
@@ -1350,6 +1385,7 @@ function renderPage(name) {
     case 'stats':        renderStats();        break;
     case 'outliers':     renderOutliers();     break;
     case 'catking':      renderCatKing();      break;
+    case 'koh':          renderKOH();          break;
   }
 }
 
@@ -1579,8 +1615,6 @@ function renderStandings() {
   document.getElementById('standings-stats').innerHTML = `
     <div class="stat-tile"><div class="sv">${rows.length || 12}</div><div class="sl">Teams</div></div>
     <div class="stat-tile"><div class="sv">${D.meta?.season || 2026}</div><div class="sl">Season</div></div>
-    <div class="stat-tile"><div class="sv">${D.schedule?.length || 23}</div><div class="sl">Weeks</div></div>
-    <div class="stat-tile"><div class="sv">${totalIL}</div><div class="sl">On IL</div></div>
   `;
 
   // Table
@@ -1589,9 +1623,17 @@ function renderStandings() {
 
   tbody.innerHTML = rows.map((row, i) => {
     const name = row.teamName || row.name || '?';
-    const [w, l, t] = (row.points || '0-0-0').split('-').map(Number);
+    // Fantrax API can return record as "W-L-T" string OR as separate wins/losses/ties fields
+    let w = 0, l = 0, t = 0;
+    if (row.points && typeof row.points === 'string' && row.points.includes('-')) {
+      [w, l, t] = row.points.split('-').map(Number);
+    } else {
+      w = row.wins ?? row.w ?? 0;
+      l = row.losses ?? row.l ?? 0;
+      t = row.ties ?? row.t ?? 0;
+    }
     const pct = fmtPct(row.winPercentage);
-    const gb = i === 0 ? '—' : (row.gamesBack || '—');
+    const gb = i === 0 ? '—' : (row.gamesBack != null ? row.gamesBack : '—');
     const streak = row.streak || '';
     const tid = row.teamId || '';
     const owner = D.teams?.[tid]?.owner || '';
@@ -1599,7 +1641,6 @@ function renderStandings() {
     const strHtml = streak
       ? `<span class="badge ${streak.startsWith('W') ? 'streak-w badge-green' : 'streak-l badge-red'}">${streak}</span>`
       : '—';
-    const ilCount = (D.rosters?.[tid]?.players || []).filter(p => p.status === 'INJURED_RESERVE').length;
     const youClass = tid === YOU_ID ? 'style="background:rgba(68,138,255,.04)"' : '';
 
     return `<tr ${youClass}>
@@ -1618,7 +1659,7 @@ function renderStandings() {
       <td class="tc">${t || 0}</td>
       <td class="tc" style="color:var(--green);font-family:var(--mono);font-weight:700">${pct}</td>
       <td class="tc" style="color:var(--text3);font-family:var(--mono);font-size:11px">${gb}</td>
-      <td class="tc">${strHtml}${ilCount > 0 ? ` <span class="badge badge-red">${ilCount} IL</span>` : ''}</td>
+      <td class="tc">${strHtml}</td>
     </tr>`;
   }).join('');
 }
@@ -1843,13 +1884,13 @@ function getWeekDates(period) {
 
 async function renderMatchups() {
   const D = APP.data;
-  if (!D?.schedule?.length) return;
+  if (!D) return;
 
-  // Load probable pitchers in background
-  fetchProbablePitchers().then(() => {
-    winProbCache = {}; // Clear cache so probabilities refresh
-    renderMatchupCards();
-  });
+  if (!D.schedule?.length) {
+    const grid = document.getElementById('matchup-grid');
+    if (grid) grid.innerHTML = '<div style="color:var(--text3);padding:40px;text-align:center;font-size:13px">Schedule not yet loaded. Check back after the season starts.</div>';
+    return;
+  }
 
   // Populate week selector
   const sel = document.getElementById('matchup-week');
@@ -1860,7 +1901,18 @@ async function renderMatchups() {
       o.textContent = 'Week ' + w.period;
       sel.appendChild(o);
     });
+    // Auto-select current week based on today's date
+    const today = new Date();
+    const seasonStart = new Date('2026-03-25');
+    const weekNum = Math.max(1, Math.min(D.schedule.length, Math.floor((today - seasonStart) / (7 * 24 * 60 * 60 * 1000)) + 1));
+    if (sel) sel.value = weekNum;
   }
+
+  // Load probable pitchers in background
+  fetchProbablePitchers().then(() => {
+    winProbCache = {};
+    renderMatchupCards();
+  });
 
   renderMatchupCards();
 }
@@ -2029,16 +2081,67 @@ function renderMatchupPreview(week, period, weekDates) {
 
 function renderPower() {
   const D = APP.data;
+  const H = APP.history;
   if (!D) return;
 
   const teams = allTeams();
+
+  // How far into the season are we? (0.0 = start, 1.0 = end of week 18)
+  const today = new Date();
+  const seasonStart = new Date('2026-03-25');
+  const seasonEnd = new Date('2026-08-15'); // ~18 weeks
+  const seasonProgress = Math.min(1, Math.max(0, (today - seasonStart) / (seasonEnd - seasonStart)));
+  // Early season: weight projections more. Late season: weight results more.
+  const resultsWeight = seasonProgress;       // 0→1 over season
+  const projWeight = 1 - seasonProgress;      // 1→0 over season
+
+  // Get 2026 weekly actual results so far
+  const weekly2026 = H?.weeklyScores?.['2026'] || {};
+  const weeksPlayed = Object.keys(weekly2026).length;
+
+  // Compute actual season results per team
+  const actualResults = {};
+  Object.entries(weekly2026).forEach(([wk, rows]) => {
+    rows.forEach(r => {
+      if (!actualResults[r.team]) actualResults[r.team] = { W: 0, L: 0, T: 0, catWins: 0 };
+      const res = actualResults[r.team];
+      if (r.cat_W > r.cat_L) res.W++;
+      else if (r.cat_L > r.cat_W) res.L++;
+      else res.T++;
+      res.catWins += r.cat_W || 0;
+    });
+  });
+
   const scored = teams.map(team => {
     const s = rosterScore(team);
-    const histPts = allTimeWinPct(team.name) * 20; // historical bonus
+    const histPts = allTimeWinPct(team.name) * 15;
     const champBonus = champCount(team.name) * 5;
-    const dynastyScore = Math.round(s.score + histPts + champBonus);
 
-    return { ...team, ...s, dynastyScore };
+    // Projection score (roster-based, same as before)
+    const projScore = s.score + histPts + champBonus;
+
+    // Results score (actual W-L record this season)
+    const res = actualResults[team.name] || { W: 0, L: 0, T: 0, catWins: 0 };
+    const totalGames = res.W + res.L + res.T;
+    const winPct = totalGames > 0 ? (res.W + res.T * 0.5) / totalGames : 0.5;
+    const resultScore = 200 + (winPct - 0.5) * 200; // 100–300 range
+
+    // Blend: early season = projections, late season = results
+    const dynastyScore = Math.round(projScore * projWeight + resultScore * resultsWeight);
+
+    // Tier breakdown: count players by ADP tier
+    const active = (team.players || []).filter(p => p.status === 'ACTIVE');
+    const tier1 = active.filter(p => p.adp <= 50).length;   // Elite
+    const tier2 = active.filter(p => p.adp > 50 && p.adp <= 125).length;  // Star
+    const tier3 = active.filter(p => p.adp > 125 && p.adp <= 200).length; // Solid
+    const tier4 = active.filter(p => p.adp > 200 && p.adp <= 300).length; // Depth
+    const minors = (team.players || []).filter(p => p.status === 'MINORS');
+    const prospectScore = minors.reduce((sum, p) => sum + Math.max(0, 300 - (p.adp || 300)), 0) / 300;
+
+    return { ...team, ...s, dynastyScore, projScore: Math.round(projScore),
+             resultScore: Math.round(resultScore), tier1, tier2, tier3, tier4,
+             prospectScore: Math.round(prospectScore), res, winPct,
+             weeksPlayed };
   }).sort((a, b) => b.dynastyScore - a.dynastyScore);
 
   const list = document.getElementById('power-list');
@@ -2050,29 +2153,34 @@ function renderPower() {
     const tierClass = i === 0 ? 'tier-elite' : i < 4 ? 'tier-contender' : i < 8 ? 'tier-fringe' : 'tier-rebuild';
     const you = team.id === YOU_ID;
 
-    // Prospect highlight — find top minor leaguers
     const topProspect = (team.players || [])
       .filter(p => p.status === 'MINORS' && p.adp < 350)
       .sort((a, b) => a.adp - b.adp)[0];
 
-    const cats = [
-      { l: 'Hitters', v: team.hitCount, g: 8, b: 5 },
-      { l: 'SP', v: team.spCount, g: 4, b: 2 },
-      { l: 'RP', v: team.rpCount, g: 3, b: 1 },
-      { l: '⭐ Elite', v: team.elite, g: 3, b: 1 },
-      { l: '🌱 Prospects', v: team.prospectValue > 0 ? Math.round(team.prospectValue / 3) : 0, g: 3, b: 1 },
-      { l: 'IL', v: team.il, g: 0, b: 2, inv: true },
+    // Record display
+    const recStr = team.res.W + team.res.L + team.res.T > 0
+      ? `${team.res.W}-${team.res.L}-${team.res.T}`
+      : 'No results yet';
+
+    // Tier pill cells
+    const tiers = [
+      { label: '⭐ Elite', val: team.tier1, color: 'var(--accent)' },
+      { label: '💫 Star', val: team.tier2, color: 'var(--green)' },
+      { label: '✅ Solid', val: team.tier3, color: 'var(--blue)' },
+      { label: '📦 Depth', val: team.tier4, color: 'var(--text3)' },
+      { label: '🌱 Minors', val: (team.players||[]).filter(p=>p.status==='MINORS').length, color: 'var(--purple)' },
     ];
 
-    const catHtml = cats.map(c => {
-      const cls = c.inv
-        ? (c.v <= c.g ? 'good' : c.v <= c.b ? 'ok' : 'bad')
-        : (c.v >= c.g ? 'good' : c.v >= c.b ? 'ok' : 'bad');
-      return `<div class="pr-cat">
-        <span class="pr-cat-label">${c.l}</span>
-        <span class="pr-cat-val ${cls}">${c.v}</span>
-      </div>`;
-    }).join('');
+    const tierHtml = tiers.map(t =>
+      `<div class="pr-cat"><span class="pr-cat-label">${t.label}</span><span class="pr-cat-val" style="color:${t.color}">${t.val}</span></div>`
+    ).join('');
+
+    // Blend indicator
+    const blendNote = seasonProgress < 0.1
+      ? '📊 Projection-based (season just started)'
+      : seasonProgress < 0.5
+      ? `📊${Math.round(projWeight*100)}% proj + 📈${Math.round(resultsWeight*100)}% results`
+      : `📈${Math.round(resultsWeight*100)}% results + 📊${Math.round(projWeight*100)}% proj`;
 
     list.innerHTML += `
       <div class="pr-card${you ? ' is-you' : ''}">
@@ -2080,24 +2188,28 @@ function renderPower() {
         <div class="pr-body">
           <div class="pr-team-name">${teamAvatarHtml(team.name, 22)} ${team.name}${you ? ' ★' : ''}</div>
           <div class="pr-owner">${team.owner}${champCount(team.name) > 0 ? ' · 🏆'.repeat(champCount(team.name)) : ''}</div>
-          <div class="pr-cats">${catHtml}</div>
+          <div style="font-size:11px;color:var(--text3);margin:4px 0 6px">
+            ${weeksPlayed > 0 ? '<span style=\"color:var(--text2)\">Record: <b>' + recStr + '</b></span> &nbsp;·&nbsp;' : ''}
+            <span>${blendNote}</span>
+          </div>
+          <div class="pr-cats">${tierHtml}</div>
           ${topProspect ? `<div style="margin-top:6px;font-size:11px;color:var(--purple)">🌱 Top prospect: ${topProspect.name} (ADP ${topProspect.adp.toFixed(0)})</div>` : ''}
           <span class="pr-tier ${tierClass}" style="margin-top:6px">${tier}</span>
         </div>
         <div class="pr-score-block">
           <div class="pr-score">${team.dynastyScore}</div>
-          <div style="font-size:10px;color:var(--text3)">Dynasty</div>
+          <div style="font-size:10px;color:var(--text3)">Score</div>
           <div style="font-size:10px;color:var(--text3);margin-top:2px">ADP avg ${team.avgAdp.toFixed(0)}</div>
           ${team.il > 0 ? `<div style="font-size:10px;color:var(--red);margin-top:2px">${team.il} IL</div>` : ''}
         </div>
       </div>`;
   });
 
-  // Scoring note
   document.getElementById('power-cats-note').innerHTML = `
     Scoring: <strong>R · HR · RBI · K · SB · AVG · OPS</strong> (hitting) &nbsp;|&nbsp;
     <strong>IP · H · K · QS · ERA · WHIP · SV+HLD</strong> (pitching) &nbsp;|&nbsp;
-    Dynasty bonus: prospects, history, championships
+    Early season = roster projections · Late season = actual results &nbsp;|&nbsp;
+    Minors players add 5–10% of total score
   `;
 }
 
@@ -2711,41 +2823,92 @@ async function analyzeTrade() {
 
   
 
-  // ── MATH FALLBACK (no API key) ──
-  function playerSummary(p) {
+  // ── RICH HTML OUTPUT ──
+  function playerCard(p, side) {
     const pr = p.profile;
-    const parts = [];
-    parts.push(p.name + ' (' + p.pos + ')');
-    parts.push('Dynasty tier: ' + pr.tier);
-    parts.push('Cat impact: ' + pr.catImpact.cats.join(', '));
-    if (pr.isLikelyProspect) parts.push('Young/upside piece — dynasty premium');
-    else if (pr.isLikelyEliteVet) parts.push('Proven elite — peak production now');
-    else parts.push('Solid contributor');
-    return parts.join(' · ');
+    const sideColor = side === 'give' ? 'var(--red)' : 'var(--green)';
+    const tierColor = pr.tier === 'Elite' ? 'var(--accent)' : pr.tier === 'Solid starter' ? 'var(--green)' : pr.tier === 'Depth piece' ? 'var(--blue)' : 'var(--text3)';
+    const ageLabel = pr.isLikelyProspect ? '🌱 Young/Upside' : pr.isLikelyEliteVet ? '⭐ Proven Elite' : '📊 Established';
+    // Score bar
+    const scoreBarW = Math.min(100, Math.round(pr.total / 220 * 100));
+    return `
+    <div style="background:var(--card2);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:10px 12px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:9px;font-family:var(--mono);font-weight:700;padding:2px 6px;border-radius:4px;background:${(POS_COLORS[pr.pos]||'#888')}22;color:${POS_COLORS[pr.pos]||'#888'}">${pr.pos}</span>
+        <span style="font-weight:600;font-size:13px">${p.name}</span>
+        <span style="font-size:10px;color:${tierColor};margin-left:auto">${pr.tier}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="width:${scoreBarW}%;height:100%;background:${sideColor};border-radius:3px;transition:width .4s"></div>
+        </div>
+        <span style="font-family:var(--display);font-size:18px;color:${sideColor};min-width:36px;text-align:right">${pr.total}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap">
+        <span>${ageLabel}</span>
+        <span>·</span>
+        <span>Affects: ${pr.catImpact.cats.slice(0,4).join(', ')}</span>
+      </div>
+    </div>`;
   }
 
-  out.textContent = [
-    verdict,
-    '',
-    'Dynasty Value Score:',
-    '  GIVING: ' + giveTotal + ' pts  (' + giveProfiles.map(p=>p.name+': '+p.profile.total).join(', ') + ')',
-    '  GETTING: ' + getTotal + ' pts  (' + getProfiles.map(p=>p.name+': '+p.profile.total).join(', ') + ')',
-    '  Net: ' + (delta>0?'+':'') + delta + ' pts (' + (deltaPct>0?'+':'') + deltaPct + '%)',
-    '',
-    balanceNotes.length ? 'Notes: ' + balanceNotes.join(' | ') : '',
-    '',
-    'Player Profiles:',
-    'GIVING:',
-    ...giveProfiles.map(p => '  ' + playerSummary(p)),
-    'GETTING:',
-    ...getProfiles.map(p => '  ' + playerSummary(p)),
-    '',
-    'Scoring Category Impact:',
-    ...giveProfiles.map(p => '  − ' + p.name + ' (' + p.pos + '): affects ' + p.profile.catImpact.cats.join(', ')),
-    ...getProfiles.map(p => '  + ' + p.name + ' (' + p.pos + '): helps ' + p.profile.catImpact.cats.join(', ')),
-    '',
-    'Add a Claude API key for full AI analysis using real FanGraphs projections, Baseball Savant data, and MLB prospect rankings.'
-  ].filter(x => x !== null).join('\n');
+  const verdictColor = delta > 12 ? 'var(--green)' : delta < -12 ? 'var(--red)' : 'var(--accent)';
+  const barGive = Math.round(giveTotal / (giveTotal + getTotal) * 100);
+  const barGet = 100 - barGive;
+
+  let html = `
+  <div style="background:var(--card2);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px">
+    <!-- Verdict -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:${verdictColor}">${verdict}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Dynasty value score · Career + current + future projection</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:var(--display);font-size:36px;color:${verdictColor};line-height:1">${delta>0?'+':''}${delta}</div>
+        <div style="font-size:10px;color:var(--text3)">pts difference</div>
+      </div>
+    </div>
+
+    <!-- Value comparison bar -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px">
+        <span>YOU GIVE — ${giveTotal} pts</span>
+        <span>YOU GET — ${getTotal} pts</span>
+      </div>
+      <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;display:flex">
+        <div style="width:${barGive}%;background:var(--red);opacity:.7;transition:width .5s"></div>
+        <div style="width:${barGet}%;background:var(--green);opacity:.7;transition:width .5s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:3px">
+        <span style="color:var(--red)">${barGive}% of value</span>
+        <span style="color:var(--green)">${barGet}% of value</span>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    ${balanceNotes.filter(n=>n.startsWith('⚠️')).map(n=>`<div style="background:rgba(255,213,79,.08);border:1px solid rgba(255,213,79,.3);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px">${n}</div>`).join('')}
+    ${balanceNotes.filter(n=>!n.startsWith('⚠️')).map(n=>`<div style="background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px">${n}</div>`).join('')}
+
+    <!-- Player cards side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">
+      <div>
+        <div style="font-size:11px;color:var(--red);font-family:var(--cond);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">YOU GIVE</div>
+        ${giveProfiles.map(p => playerCard(p, 'give')).join('')}
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--green);font-family:var(--cond);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">YOU GET</div>
+        ${getProfiles.map(p => playerCard(p, 'get')).join('')}
+      </div>
+    </div>
+
+    <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--text3)">
+      Score = Current production (ADP proxy) + Position scarcity + Category count + Age/upside premium ·
+      Add a Claude API key for full AI analysis with FanGraphs projections
+    </div>
+  </div>`;
+
+  out.innerHTML = html;
 
   btn.disabled = false; btn.textContent = 'Analyze Trade';
 }
@@ -3090,6 +3253,11 @@ function renderResumeFor(teamId) {
     '</div>' +
 
     '<div style="padding:16px">' +
+    '<div class="resume-section-title">📊 Category Percentiles vs League</div>' +
+    buildStatcastVisual(name) +
+    '</div>' +
+
+    '<div style="padding:16px">' +
     '<div class="resume-section-title">2026 Outlook</div>' +
     '<div style="font-size:13px;color:var(--text2);line-height:1.75">' + outlook + '</div>' +
     (bestYear ? '<div style="margin-top:12px;padding:10px;background:rgba(0,230,118,.06);border-radius:8px;border:1px solid rgba(0,230,118,.15)">' +
@@ -3101,6 +3269,72 @@ function renderResumeFor(teamId) {
 
     '</div>' +
     '</div>';
+}
+
+function buildStatcastVisual(teamName) {
+  const H = APP.history;
+  if (!H) return '';
+
+  // Use 2025 season totals as the most complete dataset
+  const totals2025 = H.seasonTotals?.['2025'] || {};
+  const totals2024 = H.seasonTotals?.['2024'] || {};
+  const allTeams2025 = Object.keys(totals2025);
+
+  if (!allTeams2025.length) return '<div style="font-size:12px;color:var(--text3)">Season data needed for percentile view.</div>';
+
+  // Categories to show with labels and whether lower is better
+  const cats = [
+    { key: 'R',    label: 'Runs',     low: false, emoji: '🏃' },
+    { key: 'HR',   label: 'HR',       low: false, emoji: '💥' },
+    { key: 'RBI',  label: 'RBI',      low: false, emoji: '📌' },
+    { key: 'SB',   label: 'SB',       low: false, emoji: '⚡' },
+    { key: 'AVG',  label: 'AVG',      low: false, emoji: '🎯' },
+    { key: 'OPS',  label: 'OPS',      low: false, emoji: '📈' },
+    { key: 'QS',   label: 'QS',       low: false, emoji: '✅' },
+    { key: 'K',    label: 'K (pit)',  low: false, emoji: '🔥' },
+    { key: 'ERA',  label: 'ERA',      low: true,  emoji: '🛡️' },
+    { key: 'WHIP', label: 'WHIP',     low: true,  emoji: '🧱' },
+    { key: 'SVH',  label: 'SV+HLD',  low: false, emoji: '🔒' },
+  ];
+
+  // Compute percentile for team in each cat across 2025
+  function pct(teamName, cat, low) {
+    const myVal = totals2025[teamName]?.[cat];
+    if (myVal == null) return null;
+    const allVals = allTeams2025.map(t => totals2025[t]?.[cat]).filter(v => v != null);
+    if (!allVals.length) return null;
+    const better = low
+      ? allVals.filter(v => v > myVal).length   // lower = better, so beating more = higher pct
+      : allVals.filter(v => v < myVal).length;
+    return Math.round((better / (allVals.length - 1)) * 100);
+  }
+
+  const catData = cats.map(c => {
+    const p = pct(teamName, c.key, c.low);
+    const val = totals2025[teamName]?.[c.key];
+    return { ...c, percentile: p, val };
+  }).filter(c => c.percentile != null);
+
+  if (!catData.length) return '<div style="font-size:12px;color:var(--text3)">No 2025 data available.</div>';
+
+  const rows = catData.map(c => {
+    const p = c.percentile;
+    const color = p >= 75 ? 'var(--green)' : p >= 50 ? 'var(--blue)' : p >= 25 ? 'var(--accent)' : 'var(--red)';
+    const label = p >= 75 ? 'Elite' : p >= 50 ? 'Above Avg' : p >= 25 ? 'Below Avg' : 'Weak';
+    const fmtVal = typeof c.val === 'number' && c.val < 1 ? c.val.toFixed(3) : Math.round(c.val);
+    return '<div style="display:grid;grid-template-columns:28px 70px 1fr 60px 65px;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+      '<div style="font-size:13px">' + c.emoji + '</div>' +
+      '<div style="font-size:12px;font-weight:500">' + c.label + '</div>' +
+      '<div style="position:relative;height:8px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden">' +
+        '<div style="position:absolute;left:0;top:0;height:100%;width:' + p + '%;background:' + color + ';border-radius:4px;transition:width .6s ease"></div>' +
+      '</div>' +
+      '<div style="font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right">' + fmtVal + '</div>' +
+      '<div style="font-size:10px;color:' + color + ';text-align:right;font-weight:600">' + p + 'th &nbsp;<span style="font-weight:400;color:var(--text3)">' + label + '</span></div>' +
+    '</div>';
+  }).join('');
+
+  return '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Percentile vs rest of league — 2025 season totals</div>' +
+    '<div style="background:var(--card2);border-radius:8px;padding:10px 12px">' + rows + '</div>';
 }
 
 function getTeamTitle(name, team, seasonResults, champs) {
@@ -3526,87 +3760,80 @@ function renderLuck() {
   const H = APP.history;
   if (!H) return;
 
-  const year = document.getElementById('luck-year')?.value || '2025';
-  const luckYear = H.luckIndex?.[year];
+  const year = document.getElementById('luck-year')?.value || '2026';
+  const container = document.getElementById('luck-container');
 
+  if (year === '2026') {
+    const weekly = H.weeklyScores?.['2026'];
+    if (!weekly || !Object.keys(weekly).length) {
+      container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">2026 Luck Index will populate as weeks complete.<br><span style="font-size:11px;opacity:.6;margin-top:8px;display:block">Data updates daily at 8am CST.</span></div>';
+      return;
+    }
+  }
+
+  const luckYear = H.luckIndex?.[year];
   if (!luckYear || !Object.keys(luckYear).length) {
-    document.getElementById('luck-container').innerHTML = emptyHtml(`No luck data for ${year}.`);
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">No luck data for ' + year + '.</div>';
     return;
   }
 
-  // Sort most unlucky → most lucky (positive luck_score = unlucky)
   const sorted = Object.entries(luckYear)
     .map(([team, d]) => ({ team, ...d }))
     .sort((a, b) => b.luck_score - a.luck_score);
 
   const maxAbs = Math.max(...sorted.map(d => Math.abs(d.luck_score)), 1);
-
-  const rows = sorted.map((d, i) => {
-    const ls = d.luck_score;
-    const wae = d.wins_above_expected;
-    const isUnlucky = ls > 5;
-    const isLucky = ls < -5;
-    const luckLabel = isUnlucky ? '😤 Unlucky' : isLucky ? '🍀 Lucky' : '⚖️ Even';
-    const luckColor = isUnlucky ? 'var(--red)' : isLucky ? 'var(--green)' : 'var(--text3)';
-    const barPct = Math.round(Math.abs(ls) / maxAbs * 100);
-    const barColor = ls > 0 ? 'rgba(255,82,82,0.35)' : 'rgba(0,230,118,0.35)';
-    const barDir = ls > 0 ? 'left' : 'right';
-
-    // Luckiest/unluckiest week callout
-    const unlk = d.unluckiest_week;
-    const lk = d.luckiest_week;
-    const unlkStr = unlk ? `Wk ${unlk.week}: went ${unlk.actual} (exp ${(unlk.exp_win_pct*100).toFixed(0)}% win chance)` : '';
-    const lkStr = lk ? `Wk ${lk.week}: went ${lk.actual} (exp ${(lk.exp_win_pct*100).toFixed(0)}% win chance)` : '';
-
-    return `
-    <div style="background:var(--card);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:14px 16px;margin-bottom:8px;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;${barDir}:0;width:${barPct}%;height:100%;background:${barColor};pointer-events:none;transition:width .4s"></div>
-      <div style="position:relative;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="font-family:var(--display);font-size:28px;color:var(--text3);min-width:32px;text-align:center">${i+1}</div>
-        ${teamAvatarHtml(d.team, 26)}
-        <div style="flex:1;min-width:120px">
-          <div style="font-weight:600;font-size:13px">${d.team}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">
-            Actual: <b>${d.actual_W}-${d.actual_L}-${d.actual_T}</b> &nbsp;|&nbsp;
-            Expected: <b>${d.expected_W}W-${d.expected_L}L</b> &nbsp;|&nbsp;
-            <span style="color:${wae > 0 ? 'var(--green)' : wae < 0 ? 'var(--red)' : 'var(--text3)'}">
-              ${wae > 0 ? '+' : ''}${wae} vs expected
-            </span>
-          </div>
-        </div>
-        <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:12px;color:${luckColor};font-weight:700">${luckLabel}</div>
-          <div style="font-family:var(--display);font-size:22px;color:${luckColor};line-height:1">
-            ${ls > 0 ? '+' : ''}${ls.toFixed(1)}
-          </div>
-          <div style="font-size:10px;color:var(--text3)">luck score/wk</div>
-        </div>
-      </div>
-      ${(unlkStr || lkStr) ? `
-      <div style="position:relative;display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
-        ${unlkStr ? `<div style="font-size:11px;color:var(--red);background:rgba(255,82,82,0.08);padding:4px 8px;border-radius:6px">😤 Worst: ${unlkStr}</div>` : ''}
-        ${lkStr ? `<div style="font-size:11px;color:var(--green);background:rgba(0,230,118,0.08);padding:4px 8px;border-radius:6px">🍀 Best: ${lkStr}</div>` : ''}
-      </div>` : ''}
-    </div>`;
-  }).join('');
-
-  // Summary bar
-  const unluckiest = sorted[0];
+  const mostUnlucky = sorted[0];
   const luckiest = sorted[sorted.length - 1];
 
-  document.getElementById('luck-container').innerHTML = `
-    <div style="background:var(--card2);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:var(--text3);line-height:1.6">
-      <b style="color:var(--text)">How it works:</b> Each week, every team is simulated against all 11 other teams using their actual category stats (R, HR, RBI, SB, AVG, OPS, QS, K, ERA, WHIP, SVH, H, SO). 
-      Expected win % = how often you would have won vs the full field. 
-      If your expected win % was high but you lost your real matchup — that's bad luck.
-      <br><br>
-      <b style="color:var(--red)">Most Unlucky ${year}:</b> ${unluckiest?.team} (+${unluckiest?.luck_score?.toFixed(1)} score) — 
-      went ${unluckiest?.actual_W}-${unluckiest?.actual_L}-${unluckiest?.actual_T} but expected ${unluckiest?.expected_W}W
-      &nbsp;|&nbsp;
-      <b style="color:var(--green)">Luckiest:</b> ${luckiest?.team} (${luckiest?.luck_score?.toFixed(1)} score) — 
-      went ${luckiest?.actual_W}-${luckiest?.actual_L}-${luckiest?.actual_T} but expected only ${luckiest?.expected_W}W
-    </div>
-    ${rows}`;
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">' +
+    '<div style="background:rgba(255,82,82,.06);border:1px solid rgba(255,82,82,.2);border-radius:10px;padding:12px 14px">' +
+    '<div style="font-size:10px;color:var(--red);font-family:var(--cond);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">😤 Most Unlucky</div>' +
+    '<div style="font-weight:600;font-size:13px">' + mostUnlucky.team + '</div>' +
+    '<div style="font-size:11px;color:var(--text3);margin-top:2px">Actual: ' + mostUnlucky.actual_W + '-' + mostUnlucky.actual_L + '-' + mostUnlucky.actual_T + ' · Expected: ' + mostUnlucky.expected_W + 'W</div>' +
+    '</div>' +
+    '<div style="background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);border-radius:10px;padding:12px 14px">' +
+    '<div style="font-size:10px;color:var(--green);font-family:var(--cond);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">🍀 Luckiest</div>' +
+    '<div style="font-weight:600;font-size:13px">' + luckiest.team + '</div>' +
+    '<div style="font-size:11px;color:var(--text3);margin-top:2px">Actual: ' + luckiest.actual_W + '-' + luckiest.actual_L + '-' + luckiest.actual_T + ' · Expected: ' + luckiest.expected_W + 'W</div>' +
+    '</div></div>' +
+    '<div style="background:var(--card2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:var(--text3);line-height:1.6">' +
+    '<b style="color:var(--text2)">How it works:</b> Each week, your actual category stats are simulated vs all 11 other teams. ' +
+    'Expected win % = how often you would win vs the full field. High expected % but lost = bad luck. ' +
+    '<span style="color:var(--red)">Positive score = unlucky.</span> <span style="color:var(--green)">Negative = lucky.</span>' +
+    '</div>' +
+    '<div style="background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden">' +
+    '<div style="display:grid;grid-template-columns:36px 1fr 110px 110px 80px 80px;padding:8px 14px;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06)">' +
+    ['#','Team','Actual','Expected','W vs Exp','Luck/wk'].map(h => '<div style="font-size:10px;color:var(--text3);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase">' + h + '</div>').join('') +
+    '</div>';
+
+  sorted.forEach((d, i) => {
+    const ls = d.luck_score;
+    const wae = d.wins_above_expected;
+    const isUnlucky = ls > 8; const isLucky = ls < -8;
+    const barW = Math.round(Math.abs(ls) / maxAbs * 40);
+    const barColor = ls > 0 ? 'rgba(255,82,82,.25)' : 'rgba(0,230,118,.2)';
+    const luckColor = isUnlucky ? 'var(--red)' : isLucky ? 'var(--green)' : 'var(--text3)';
+    const luckEmoji = isUnlucky ? '😤' : isLucky ? '🍀' : '⚖️';
+    const unlk = d.unluckiest_week; const lk = d.luckiest_week;
+    html += '<div style="position:relative;border-bottom:1px solid rgba(255,255,255,.04)">' +
+      '<div style="position:absolute;top:0;left:0;height:100%;width:' + barW + '%;background:' + barColor + ';pointer-events:none"></div>' +
+      '<div style="position:relative;display:grid;grid-template-columns:36px 1fr 110px 110px 80px 80px;padding:10px 14px;align-items:center">' +
+      '<div style="font-family:var(--display);font-size:18px;color:var(--text3)">' + (i+1) + '</div>' +
+      '<div><div style="display:flex;align-items:center;gap:6px">' + teamAvatarHtml(d.team, 20) + '<span style="font-size:13px;font-weight:500">' + d.team + '</span></div>' +
+      '<div style="font-size:10px;color:var(--text3);margin-top:3px">' +
+      (unlk ? '<span style="color:var(--red)">Worst Wk' + unlk.week + ': ' + (unlk.exp_win_pct*100).toFixed(0) + '% exp → went ' + unlk.actual + '</span>' : '') +
+      (lk ? ' <span style="color:var(--green)">Best Wk' + lk.week + ': ' + (lk.exp_win_pct*100).toFixed(0) + '% exp → went ' + lk.actual + '</span>' : '') +
+      '</div></div>' +
+      '<div style="text-align:center;font-family:var(--mono);font-size:12px">' + d.actual_W + '-' + d.actual_L + '-' + d.actual_T + '</div>' +
+      '<div style="text-align:center;font-family:var(--mono);font-size:12px">' + d.expected_W + 'W-' + d.expected_L + 'L</div>' +
+      '<div style="text-align:center;font-family:var(--mono);font-size:12px;color:' + (wae > 0 ? 'var(--green)' : wae < 0 ? 'var(--red)' : 'var(--text3)') + '">' + (wae > 0 ? '+' : '') + wae + '</div>' +
+      '<div style="text-align:center"><div style="font-family:var(--display);font-size:20px;color:' + luckColor + '">' + (ls > 0 ? '+' : '') + ls.toFixed(1) + '</div>' +
+      '<div style="font-size:9px;color:var(--text3)">' + luckEmoji + '</div></div>' +
+      '</div></div>';
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 /* ═══════════════════════════════════════════════
@@ -3851,6 +4078,152 @@ function renderCatKing() {
     </div>`;
 
   container.innerHTML = html;
+}
+/* ═══════════════════════════════════════════════
+   KING OF THE HILL
+   ═══════════════════════════════════════════════ */
+
+function renderKOH() {
+  const H = APP.history;
+  const D = APP.data;
+  const container = document.getElementById('koh-container');
+  const season = document.getElementById('koh-season')?.value || '2026';
+
+  // Get weekly scores for the selected season
+  const weekly = H?.weeklyScores?.[season];
+
+  // For 2026, use live data.json weekly scores (not yet in history)
+  // Build KOH simulation from weekly matchup data
+  if (!weekly && season === '2026') {
+    container.innerHTML = `<div style="color:var(--text3);padding:40px;text-align:center;font-size:13px">
+      2026 King of the Hill will populate as weekly results come in.<br><br>
+      <span style="font-size:11px;opacity:.6">Data updates daily at 8am CST after each week locks.</span>
+    </div>`;
+    return;
+  }
+
+  if (!weekly) {
+    container.innerHTML = `<div style="color:var(--text3);padding:20px;text-align:center">No data for ${season}.</div>`;
+    return;
+  }
+
+  const TEAMS_12 = [...new Set(Object.values(weekly).flatMap(rows => rows.map(r => r.team)))].sort();
+  const sortedWeeks = Object.keys(weekly).map(Number).sort((a,b) => a-b);
+
+  // Simulate KOH: track who's eliminated each week
+  let alive = new Set(TEAMS_12);
+  let eliminated = []; // [{week, teams}]
+  let rounds = []; // one KOH game per season (resets after winner)
+  let roundNum = 1;
+  let roundElim = [];
+  let winner = null;
+
+  sortedWeeks.forEach(wk => {
+    if (alive.size <= 1) {
+      // Start new round
+      if (alive.size === 1) winner = [...alive][0];
+      rounds.push({ roundNum, eliminated: roundElim, winner });
+      roundNum++;
+      alive = new Set(TEAMS_12);
+      roundElim = [];
+      winner = null;
+    }
+
+    const weekRows = weekly[wk];
+    const byTeam = {};
+    weekRows.forEach(r => { if (alive.has(r.team)) byTeam[r.team] = r; });
+
+    if (Object.keys(byTeam).length < 2) return;
+
+    // Each alive team gets total category wins across all alive opponents
+    const CATS_H = ['R','HR','RBI','SB','AVG','OPS','QS','K','SVH'];
+    const CATS_L = ['SO','H','ERA','WHIP'];
+
+    const teamCatWins = {};
+    [...alive].forEach(t => {
+      if (!byTeam[t]) return;
+      let wins = 0;
+      const me = byTeam[t];
+      [...alive].forEach(opp => {
+        if (opp === t || !byTeam[opp]) return;
+        const them = byTeam[opp];
+        CATS_H.forEach(c => { if ((me[c]||0) > (them[c]||0)) wins++; });
+        CATS_L.forEach(c => { if ((me[c]||0) < (them[c]||0)) wins++; });
+      });
+      teamCatWins[t] = wins;
+    });
+
+    const minWins = Math.min(...Object.values(teamCatWins));
+    const losers = Object.entries(teamCatWins).filter(([,w]) => w === minWins).map(([t]) => t);
+
+    losers.forEach(t => alive.delete(t));
+    roundElim.push({ week: wk, teams: losers, allScores: teamCatWins });
+  });
+
+  // Final round
+  if (alive.size === 1) winner = [...alive][0];
+  rounds.push({ roundNum, eliminated: roundElim, winner });
+
+  // Build display
+  let html = '';
+
+  rounds.forEach(round => {
+    const stillAlive = new Set(TEAMS_12);
+    round.eliminated.forEach(e => e.teams.forEach(t => stillAlive.delete(t)));
+
+    html += `
+    <div style="background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:12px;margin-bottom:20px;overflow:hidden">
+      <div style="padding:12px 16px;background:rgba(255,213,79,.06);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px">
+        <span style="font-family:var(--display);font-size:22px;color:var(--accent)">ROUND ${round.roundNum}</span>
+        ${round.winner ? `<span style="font-size:12px;color:var(--green);background:rgba(0,230,118,.1);padding:3px 10px;border-radius:6px">🤴 Winner: ${round.winner}</span>` : ''}
+      </div>
+      <div style="padding:14px 16px">`;
+
+    // Timeline of eliminations
+    round.eliminated.forEach(e => {
+      html += `
+        <div style="margin-bottom:12px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--red)">
+          <div style="font-size:11px;color:var(--text3);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Week ${e.week} — Eliminated</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            ${e.teams.map(t => `
+              <div style="display:flex;align-items:center;gap:5px;background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.2);border-radius:6px;padding:4px 10px">
+                ${teamAvatarHtml(t, 18)}
+                <span style="font-size:12px;color:var(--red)">${t}</span>
+                <span style="font-size:10px;color:var(--text3)">(${e.allScores?.[t] ?? '?'} cat wins)</span>
+              </div>`).join('')}
+            ${e.teams.length > 1 ? '<span style="font-size:10px;color:var(--text3);font-style:italic">Tie — both eliminated</span>' : ''}
+          </div>
+        </div>`;
+    });
+
+    // Still alive teams
+    if (round.winner) {
+      html += `
+        <div style="margin-top:12px;padding:10px 12px;background:rgba(0,230,118,.06);border-radius:8px;border-left:3px solid var(--green)">
+          <div style="font-size:11px;color:var(--green);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">🤴 Last Team Standing</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            ${teamAvatarHtml(round.winner, 22)}
+            <span style="font-size:14px;font-weight:700;color:var(--green)">${round.winner}</span>
+          </div>
+        </div>`;
+    } else if (stillAlive.size > 0) {
+      html += `
+        <div style="margin-top:12px;padding:10px 12px;background:rgba(68,138,255,.05);border-radius:8px;border-left:3px solid var(--blue)">
+          <div style="font-size:11px;color:var(--blue);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Still Alive (${stillAlive.size} teams)</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${[...stillAlive].map(t => `
+              <div style="display:flex;align-items:center;gap:4px;background:rgba(68,138,255,.1);border:1px solid rgba(68,138,255,.2);border-radius:6px;padding:4px 8px">
+                ${teamAvatarHtml(t, 16)}
+                <span style="font-size:11px">${t}</span>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    }
+
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html || '<div style="color:var(--text3);padding:20px;text-align:center">No rounds completed yet.</div>';
 }
 
 </script>
