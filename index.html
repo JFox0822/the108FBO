@@ -1327,8 +1327,20 @@ async function initApp() {
     });
 
     // Update nav
-    const updated = APP.data.meta?.updatedDate || 'Unknown';
-    document.getElementById('updated-text').textContent = updated;
+    const rawUpdated = APP.data.meta?.updatedDate;
+    let updatedDisplay = 'Unknown';
+    if (rawUpdated) {
+      try {
+        const d = new Date(rawUpdated);
+        updatedDisplay = d.toLocaleString('en-US', {
+          timeZone: 'America/New_York',
+          month: 'short', day: 'numeric',
+          hour: 'numeric', minute: '2-digit',
+          hour12: true
+        }) + ' EST';
+      } catch(e) { updatedDisplay = rawUpdated; }
+    }
+    document.getElementById('updated-text').textContent = updatedDisplay;
 
     // Render active page
     const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
@@ -1901,11 +1913,9 @@ async function renderMatchups() {
       o.textContent = 'Week ' + w.period;
       sel.appendChild(o);
     });
-    // Auto-select current week based on today's date
-    const today = new Date();
-    const seasonStart = new Date('2026-03-25');
-    const weekNum = Math.max(1, Math.min(D.schedule.length, Math.floor((today - seasonStart) / (7 * 24 * 60 * 60 * 1000)) + 1));
-    if (sel) sel.value = weekNum;
+    // Auto-select the most recent week in the schedule (avoids date-math breaking on extended weeks)
+    const lastPeriod = D.schedule[D.schedule.length - 1]?.period || 1;
+    if (sel) sel.value = lastPeriod;
   }
 
   // Load probable pitchers in background
@@ -1985,13 +1995,15 @@ function renderMatchupCards() {
         '</div>';
     }
 
-    // Show final score if available
-    const hasScore = m.awayScore != null && m.homeScore != null;
+    // Show final score if available — handle multiple possible field names from Fantrax API
+    const awayScoreVal = m.awayScore ?? m.awayPoints ?? m.awayWins ?? m.away?.score ?? m.away?.points ?? m.away?.wins ?? null;
+    const homeScoreVal = m.homeScore ?? m.homePoints ?? m.homeWins ?? m.home?.score ?? m.home?.points ?? m.home?.wins ?? null;
+    const hasScore = awayScoreVal != null && homeScoreVal != null;
     const scoreHtml = hasScore
       ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">' +
-        '<span style="font-family:var(--display);font-size:24px;color:' + (m.awayScore > m.homeScore ? 'var(--green)' : m.awayScore < m.homeScore ? 'var(--text3)' : 'var(--accent)') + '">' + m.awayScore + '</span>' +
+        '<span style="font-family:var(--display);font-size:24px;color:' + (awayScoreVal > homeScoreVal ? 'var(--green)' : awayScoreVal < homeScoreVal ? 'var(--text3)' : 'var(--accent)') + '">' + awayScoreVal + '</span>' +
         '<span style="font-size:11px;color:var(--text3)">FINAL</span>' +
-        '<span style="font-family:var(--display);font-size:24px;color:' + (m.homeScore > m.awayScore ? 'var(--green)' : m.homeScore < m.awayScore ? 'var(--text3)' : 'var(--accent)') + '">' + m.homeScore + '</span>' +
+        '<span style="font-family:var(--display);font-size:24px;color:' + (homeScoreVal > awayScoreVal ? 'var(--green)' : homeScoreVal < awayScoreVal ? 'var(--text3)' : 'var(--accent)') + '">' + homeScoreVal + '</span>' +
         '</div>'
       : '';
 
@@ -3759,8 +3771,69 @@ function renderH2H() {
 }
 
 function buildH2HFromWeekly(H) {
-  // Placeholder — will be populated when full schedule data available
-  return {};
+  const matrix = {};
+
+  function addResult(winner, loser) {
+    if (!winner || !loser || winner === loser) return;
+    if (!matrix[winner]) matrix[winner] = {};
+    if (!matrix[loser])  matrix[loser]  = {};
+    if (!matrix[winner][loser]) matrix[winner][loser] = { w: 0, l: 0 };
+    if (!matrix[loser][winner]) matrix[loser][winner] = { w: 0, l: 0 };
+    matrix[winner][loser].w++;
+    matrix[loser][winner].l++;
+  }
+
+  // Build from historical weekly scores (2024, 2025)
+  const allYears = H?.weeklyScores || {};
+  Object.entries(allYears).forEach(([yr, weeks]) => {
+    if (yr === '2026') return; // handled separately via schedule
+    const scheduleForYear = H?.schedule?.[yr] || [];
+    Object.entries(weeks).forEach(([wkStr, rows]) => {
+      const wk = parseInt(wkStr);
+      const matchups = scheduleForYear.find(s => s.week === wk)?.matchups || [];
+      if (matchups.length) {
+        // Use explicit schedule matchup pairs
+        matchups.forEach(({ home, away }) => {
+          const homeRow = rows.find(r => r.team === home);
+          const awayRow = rows.find(r => r.team === away);
+          if (!homeRow || !awayRow) return;
+          const CATS_H = ['R','HR','RBI','SB','AVG','OPS','QS','K','SVH'];
+          const CATS_L = ['SO','H','ERA','WHIP'];
+          let homeWins = 0, awayWins = 0;
+          CATS_H.forEach(c => {
+            if ((homeRow[c]||0) > (awayRow[c]||0)) homeWins++;
+            else if ((awayRow[c]||0) > (homeRow[c]||0)) awayWins++;
+          });
+          CATS_L.forEach(c => {
+            if ((homeRow[c]||0) < (awayRow[c]||0)) homeWins++;
+            else if ((awayRow[c]||0) < (homeRow[c]||0)) awayWins++;
+          });
+          if (homeWins > awayWins) addResult(home, away);
+          else if (awayWins > homeWins) addResult(away, home);
+        });
+      } else {
+        // No schedule — skip, don't simulate H2H from free-for-all
+      }
+    });
+  });
+
+  // Add 2026 completed matchups from live schedule
+  const schedule2026 = APP.data?.schedule || [];
+  schedule2026.forEach(week => {
+    (week.matchupList || []).forEach(m => {
+      const awayScore = m.awayScore ?? m.awayPoints ?? m.awayWins ?? m.away?.score ?? m.away?.points ?? m.away?.wins ?? null;
+      const homeScore = m.homeScore ?? m.homePoints ?? m.homeWins ?? m.home?.score ?? m.home?.points ?? m.home?.wins ?? null;
+      if (awayScore == null || homeScore == null) return;
+      const awayName = m.away?.name;
+      const homeName = m.home?.name;
+      if (!awayName || !homeName) return;
+      if (awayScore > homeScore) addResult(awayName, homeName);
+      else if (homeScore > awayScore) addResult(homeName, awayName);
+      // ties: no W/L recorded
+    });
+  });
+
+  return matrix;
 }
 
 /* ═══════════════════════════════════════════════
@@ -4102,11 +4175,10 @@ function renderKOH() {
 
   // ── 2026 LIVE SEASON ──
   if (season === '2026') {
-    // Hard-coded known results + will grow each week
     const KOH_2026 = {
       roundNum: 1,
       eliminated: [
-        { week: 1, teams: ['Virginia Beach VelociRaptors'], note: 'Fewest category wins in Week 1' }
+        { week: 1, teams: ['Virginia Beach VelociRaptors'], note: 'Fewest category wins in Week 1 (Extended)' }
       ],
       stillAlive: [
         'Rockwall Rhinos',
@@ -4123,49 +4195,98 @@ function renderKOH() {
       ]
     };
 
+    const totalTeams = KOH_2026.stillAlive.length + KOH_2026.eliminated.reduce((s,e) => s + e.teams.length, 0);
     const weeksPlayed = KOH_2026.eliminated.length;
     const teamsLeft = KOH_2026.stillAlive.length;
+    const elimCount = totalTeams - teamsLeft;
+    const survivalPct = Math.round((teamsLeft / totalTeams) * 100);
 
-    let html = `
-    <div style="background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
-      <div style="padding:14px 16px;background:rgba(255,213,79,.06);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-family:var(--display);font-size:24px;color:var(--accent)">2026 — ROUND 1</span>
-          <span style="font-size:12px;color:var(--text3)">Week ${weeksPlayed} of 18 complete</span>
+    // Build a flat set of eliminated teams for quick lookup
+    const elimSet = new Set(KOH_2026.eliminated.flatMap(e => e.teams));
+
+    const html = `
+    <!-- Header bar -->
+    <div style="background:var(--card);border:1px solid rgba(255,213,79,.18);border-radius:14px;overflow:hidden;margin-bottom:20px">
+      <div style="padding:16px 20px;background:linear-gradient(135deg,rgba(255,213,79,.08) 0%,rgba(255,213,79,.02) 100%);border-bottom:1px solid rgba(255,213,79,.12);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-family:var(--display);font-size:26px;color:var(--accent);line-height:1">👑 ROUND 1 — 2026</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">Fewest category wins each week is eliminated · Ties = both out · Last standing wins, then resets</div>
         </div>
-        <span style="font-size:12px;background:rgba(68,138,255,.1);color:var(--blue);padding:4px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.2)">${teamsLeft} teams still alive</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="text-align:center;background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.18);border-radius:10px;padding:8px 16px">
+            <div style="font-family:var(--display);font-size:22px;color:var(--green)">${teamsLeft}</div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Alive</div>
+          </div>
+          <div style="text-align:center;background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.18);border-radius:10px;padding:8px 16px">
+            <div style="font-family:var(--display);font-size:22px;color:var(--red)">${elimCount}</div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Out</div>
+          </div>
+          <div style="text-align:center;background:rgba(68,138,255,.08);border:1px solid rgba(68,138,255,.18);border-radius:10px;padding:8px 16px">
+            <div style="font-family:var(--display);font-size:22px;color:var(--blue)">${weeksPlayed}</div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Wks Done</div>
+          </div>
+        </div>
       </div>
 
-      <!-- Eliminations so far -->
-      <div style="padding:14px 16px">
-        <div style="font-size:11px;color:var(--red);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Eliminated</div>
-        ${KOH_2026.eliminated.map(e => `
-          <div style="background:rgba(255,82,82,.06);border:1px solid rgba(255,82,82,.15);border-radius:8px;padding:10px 12px;margin-bottom:8px">
-            <div style="font-size:10px;color:var(--text3);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Week ${e.week} — ${e.note}</div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <!-- Survival progress bar -->
+      <div style="padding:12px 20px;background:rgba(0,0,0,.15);border-bottom:1px solid rgba(255,255,255,.05)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Survival</span>
+          <span style="font-size:11px;color:var(--accent);font-family:var(--mono)">${teamsLeft} / ${totalTeams} remaining</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${survivalPct}%;background:linear-gradient(90deg,var(--green),var(--accent));border-radius:4px;transition:width .4s"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Eliminations timeline -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:10px;color:var(--red);font-family:var(--cond);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:14px;height:2px;background:var(--red);border-radius:2px"></span>Eliminated
+      </div>
+      ${KOH_2026.eliminated.map(e => `
+        <div style="background:var(--card);border:1px solid rgba(255,82,82,.2);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="background:rgba(255,82,82,.12);border-radius:8px;padding:6px 12px;text-align:center;min-width:60px;flex-shrink:0">
+            <div style="font-family:var(--display);font-size:18px;color:var(--red)">Wk${e.week}</div>
+            <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Extended</div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:6px">${e.note}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
               ${e.teams.map(t => `
-                <div style="display:flex;align-items:center;gap:5px;background:rgba(255,82,82,.12);border:1px solid rgba(255,82,82,.25);border-radius:6px;padding:5px 10px">
+                <div style="display:flex;align-items:center;gap:6px;background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.22);border-radius:8px;padding:5px 10px">
                   ${teamAvatarHtml(t, 20)}
                   <span style="font-size:12px;color:var(--red);font-weight:600">${t}</span>
-                  <span style="font-size:11px;color:var(--text3)">☠️ OUT</span>
+                  <span style="font-size:14px">☠️</span>
                 </div>`).join('')}
             </div>
-          </div>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>
 
-        <!-- Still alive -->
-        <div style="font-size:11px;color:var(--blue);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 10px">Still Alive (${teamsLeft} teams)</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          ${KOH_2026.stillAlive.map((t, i) => `
-            <div style="display:flex;align-items:center;gap:5px;background:rgba(68,138,255,.08);border:1px solid rgba(68,138,255,.2);border-radius:6px;padding:5px 10px">
-              ${teamAvatarHtml(t, 18)}
-              <span style="font-size:12px">${t}</span>
-            </div>`).join('')}
-        </div>
-
-        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)">
-          ⚡ Updated each week as results lock · Fewest category wins = eliminated · Ties = both out · Last team standing wins, then restarts
-        </div>
+    <!-- Still alive grid -->
+    <div>
+      <div style="font-size:10px;color:var(--green);font-family:var(--cond);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <span style="display:inline-block;width:14px;height:2px;background:var(--green);border-radius:2px"></span>Still Alive — ${teamsLeft} Teams
       </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">
+        ${KOH_2026.stillAlive.map(t => {
+          const isYou = t === (D?.rosters?.[YOU_ID]?.name);
+          return `
+          <div style="background:var(--card);border:1px solid ${isYou ? 'rgba(68,138,255,.45)' : 'rgba(0,230,118,.18)'};border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:8px;${isYou ? 'box-shadow:0 0 14px rgba(68,138,255,.15)' : ''}">
+            ${teamAvatarHtml(t, 26)}
+            <div>
+              <div style="font-size:12px;font-weight:600;line-height:1.2">${t}${isYou ? ' <span style="color:var(--blue);font-size:9px">★ YOU</span>' : ''}</div>
+              <div style="font-size:10px;color:var(--green);margin-top:1px">✓ Alive</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <div style="margin-top:16px;font-size:10px;color:var(--text3);text-align:center">
+      ⚡ Updated manually each week as results lock in
     </div>`;
 
     container.innerHTML = html;
