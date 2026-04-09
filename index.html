@@ -1985,12 +1985,23 @@ function renderMatchupCards() {
         '</div>';
     }
 
+    // Show final score if available
+    const hasScore = m.awayScore != null && m.homeScore != null;
+    const scoreHtml = hasScore
+      ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">' +
+        '<span style="font-family:var(--display);font-size:24px;color:' + (m.awayScore > m.homeScore ? 'var(--green)' : m.awayScore < m.homeScore ? 'var(--text3)' : 'var(--accent)') + '">' + m.awayScore + '</span>' +
+        '<span style="font-size:11px;color:var(--text3)">FINAL</span>' +
+        '<span style="font-family:var(--display);font-size:24px;color:' + (m.homeScore > m.awayScore ? 'var(--green)' : m.homeScore < m.awayScore ? 'var(--text3)' : 'var(--accent)') + '">' + m.homeScore + '</span>' +
+        '</div>'
+      : '';
+
     grid.innerHTML += '<div class="matchup-card' + (you?' is-you':'') + '">' +
       '<div class="matchup-teams">' +
       '<div class="mt-away"><div class="mt-name">' + m.away.name + (awayYou?' ★':'') + '</div><div class="mt-owner">' + m.away.shortName + '</div></div>' +
       '<div><div class="mt-vs">VS</div><div class="mt-week">WK ' + period + '</div></div>' +
       '<div class="mt-home"><div class="mt-name">' + m.home.name + (homeYou?' ★':'') + '</div><div class="mt-owner">' + m.home.shortName + '</div></div>' +
       '</div>' +
+      scoreHtml +
       probHtml +
       '</div>';
   });
@@ -4089,40 +4100,99 @@ function renderKOH() {
   const container = document.getElementById('koh-container');
   const season = document.getElementById('koh-season')?.value || '2026';
 
-  // Get weekly scores for the selected season
-  const weekly = H?.weeklyScores?.[season];
+  // ── 2026 LIVE SEASON ──
+  if (season === '2026') {
+    // Hard-coded known results + will grow each week
+    const KOH_2026 = {
+      roundNum: 1,
+      eliminated: [
+        { week: 1, teams: ['Virginia Beach VelociRaptors'], note: 'Fewest category wins in Week 1' }
+      ],
+      stillAlive: [
+        'Rockwall Rhinos',
+        'Salt Lake City Sluggers',
+        'San Diego Dysons',
+        'Alaskan Blue Balls',
+        'Albuquerque Predators',
+        'Georgia Peaches',
+        'Florida Easy Money',
+        'Marco Island Mermaids',
+        'Saravejo Archdukes',
+        'Athens Amish Mafia',
+        "Anaheim Arte's",
+      ]
+    };
 
-  // For 2026, use live data.json weekly scores (not yet in history)
-  // Build KOH simulation from weekly matchup data
-  if (!weekly && season === '2026') {
-    container.innerHTML = `<div style="color:var(--text3);padding:40px;text-align:center;font-size:13px">
-      2026 King of the Hill will populate as weekly results come in.<br><br>
-      <span style="font-size:11px;opacity:.6">Data updates daily at 8am CST after each week locks.</span>
+    const weeksPlayed = KOH_2026.eliminated.length;
+    const teamsLeft = KOH_2026.stillAlive.length;
+
+    let html = `
+    <div style="background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
+      <div style="padding:14px 16px;background:rgba(255,213,79,.06);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--display);font-size:24px;color:var(--accent)">2026 — ROUND 1</span>
+          <span style="font-size:12px;color:var(--text3)">Week ${weeksPlayed} of 18 complete</span>
+        </div>
+        <span style="font-size:12px;background:rgba(68,138,255,.1);color:var(--blue);padding:4px 12px;border-radius:6px;border:1px solid rgba(68,138,255,.2)">${teamsLeft} teams still alive</span>
+      </div>
+
+      <!-- Eliminations so far -->
+      <div style="padding:14px 16px">
+        <div style="font-size:11px;color:var(--red);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Eliminated</div>
+        ${KOH_2026.eliminated.map(e => `
+          <div style="background:rgba(255,82,82,.06);border:1px solid rgba(255,82,82,.15);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Week ${e.week} — ${e.note}</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              ${e.teams.map(t => `
+                <div style="display:flex;align-items:center;gap:5px;background:rgba(255,82,82,.12);border:1px solid rgba(255,82,82,.25);border-radius:6px;padding:5px 10px">
+                  ${teamAvatarHtml(t, 20)}
+                  <span style="font-size:12px;color:var(--red);font-weight:600">${t}</span>
+                  <span style="font-size:11px;color:var(--text3)">☠️ OUT</span>
+                </div>`).join('')}
+            </div>
+          </div>`).join('')}
+
+        <!-- Still alive -->
+        <div style="font-size:11px;color:var(--blue);font-family:var(--cond);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 10px">Still Alive (${teamsLeft} teams)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${KOH_2026.stillAlive.map((t, i) => `
+            <div style="display:flex;align-items:center;gap:5px;background:rgba(68,138,255,.08);border:1px solid rgba(68,138,255,.2);border-radius:6px;padding:5px 10px">
+              ${teamAvatarHtml(t, 18)}
+              <span style="font-size:12px">${t}</span>
+            </div>`).join('')}
+        </div>
+
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)">
+          ⚡ Updated each week as results lock · Fewest category wins = eliminated · Ties = both out · Last team standing wins, then restarts
+        </div>
+      </div>
     </div>`;
+
+    container.innerHTML = html;
     return;
   }
 
+  // ── HISTORICAL SEASONS (simulate from weekly data) ──
+  const weekly = H?.weeklyScores?.[season];
+
   if (!weekly) {
-    container.innerHTML = `<div style="color:var(--text3);padding:20px;text-align:center">No data for ${season}.</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text3)">No data for ${season}.</div>`;
     return;
   }
 
   const TEAMS_12 = [...new Set(Object.values(weekly).flatMap(rows => rows.map(r => r.team)))].sort();
   const sortedWeeks = Object.keys(weekly).map(Number).sort((a,b) => a-b);
 
-  // Simulate KOH: track who's eliminated each week
   let alive = new Set(TEAMS_12);
-  let eliminated = []; // [{week, teams}]
-  let rounds = []; // one KOH game per season (resets after winner)
+  let rounds = [];
   let roundNum = 1;
   let roundElim = [];
   let winner = null;
 
   sortedWeeks.forEach(wk => {
     if (alive.size <= 1) {
-      // Start new round
       if (alive.size === 1) winner = [...alive][0];
-      rounds.push({ roundNum, eliminated: roundElim, winner });
+      rounds.push({ roundNum, eliminated: roundElim, winner, finalAlive: [...alive] });
       roundNum++;
       alive = new Set(TEAMS_12);
       roundElim = [];
@@ -4132,13 +4202,10 @@ function renderKOH() {
     const weekRows = weekly[wk];
     const byTeam = {};
     weekRows.forEach(r => { if (alive.has(r.team)) byTeam[r.team] = r; });
-
     if (Object.keys(byTeam).length < 2) return;
 
-    // Each alive team gets total category wins across all alive opponents
     const CATS_H = ['R','HR','RBI','SB','AVG','OPS','QS','K','SVH'];
     const CATS_L = ['SO','H','ERA','WHIP'];
-
     const teamCatWins = {};
     [...alive].forEach(t => {
       if (!byTeam[t]) return;
@@ -4155,72 +4222,56 @@ function renderKOH() {
 
     const minWins = Math.min(...Object.values(teamCatWins));
     const losers = Object.entries(teamCatWins).filter(([,w]) => w === minWins).map(([t]) => t);
-
     losers.forEach(t => alive.delete(t));
     roundElim.push({ week: wk, teams: losers, allScores: teamCatWins });
   });
 
-  // Final round
   if (alive.size === 1) winner = [...alive][0];
-  rounds.push({ roundNum, eliminated: roundElim, winner });
+  rounds.push({ roundNum, eliminated: roundElim, winner, finalAlive: [...alive] });
 
-  // Build display
+  // Render historical rounds
   let html = '';
-
   rounds.forEach(round => {
-    const stillAlive = new Set(TEAMS_12);
-    round.eliminated.forEach(e => e.teams.forEach(t => stillAlive.delete(t)));
-
     html += `
     <div style="background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:12px;margin-bottom:20px;overflow:hidden">
       <div style="padding:12px 16px;background:rgba(255,213,79,.06);border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px">
         <span style="font-family:var(--display);font-size:22px;color:var(--accent)">ROUND ${round.roundNum}</span>
-        ${round.winner ? `<span style="font-size:12px;color:var(--green);background:rgba(0,230,118,.1);padding:3px 10px;border-radius:6px">🤴 Winner: ${round.winner}</span>` : ''}
+        ${round.winner ? `<span style="font-size:12px;color:var(--green);background:rgba(0,230,118,.1);padding:3px 10px;border-radius:6px;border:1px solid rgba(0,230,118,.2)">🤴 Winner: ${round.winner}</span>` : ''}
       </div>
-      <div style="padding:14px 16px">`;
-
-    // Timeline of eliminations
-    round.eliminated.forEach(e => {
-      html += `
-        <div style="margin-bottom:12px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--red)">
-          <div style="font-size:11px;color:var(--text3);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Week ${e.week} — Eliminated</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            ${e.teams.map(t => `
-              <div style="display:flex;align-items:center;gap:5px;background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.2);border-radius:6px;padding:4px 10px">
-                ${teamAvatarHtml(t, 18)}
-                <span style="font-size:12px;color:var(--red)">${t}</span>
-                <span style="font-size:10px;color:var(--text3)">(${e.allScores?.[t] ?? '?'} cat wins)</span>
-              </div>`).join('')}
-            ${e.teams.length > 1 ? '<span style="font-size:10px;color:var(--text3);font-style:italic">Tie — both eliminated</span>' : ''}
-          </div>
-        </div>`;
-    });
-
-    // Still alive teams
-    if (round.winner) {
-      html += `
-        <div style="margin-top:12px;padding:10px 12px;background:rgba(0,230,118,.06);border-radius:8px;border-left:3px solid var(--green)">
-          <div style="font-size:11px;color:var(--green);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">🤴 Last Team Standing</div>
-          <div style="display:flex;align-items:center;gap:6px">
-            ${teamAvatarHtml(round.winner, 22)}
-            <span style="font-size:14px;font-weight:700;color:var(--green)">${round.winner}</span>
-          </div>
-        </div>`;
-    } else if (stillAlive.size > 0) {
-      html += `
-        <div style="margin-top:12px;padding:10px 12px;background:rgba(68,138,255,.05);border-radius:8px;border-left:3px solid var(--blue)">
-          <div style="font-size:11px;color:var(--blue);font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Still Alive (${stillAlive.size} teams)</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${[...stillAlive].map(t => `
-              <div style="display:flex;align-items:center;gap:4px;background:rgba(68,138,255,.1);border:1px solid rgba(68,138,255,.2);border-radius:6px;padding:4px 8px">
-                ${teamAvatarHtml(t, 16)}
-                <span style="font-size:11px">${t}</span>
-              </div>`).join('')}
-          </div>
-        </div>`;
-    }
-
-    html += '</div></div>';
+      <div style="padding:14px 16px">
+        ${round.eliminated.map(e => `
+          <div style="margin-bottom:10px;padding:10px 12px;background:rgba(255,82,82,.05);border-radius:8px;border-left:3px solid var(--red)">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--cond);text-transform:uppercase;margin-bottom:6px">Week ${e.week} — Eliminated</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              ${e.teams.map(t => `
+                <div style="display:flex;align-items:center;gap:5px;background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.2);border-radius:6px;padding:4px 10px">
+                  ${teamAvatarHtml(t, 18)}
+                  <span style="font-size:12px;color:var(--red)">${t}</span>
+                  <span style="font-size:10px;color:var(--text3)">(${e.allScores?.[t] ?? '?'} cat wins)</span>
+                </div>`).join('')}
+              ${e.teams.length > 1 ? '<span style="font-size:10px;color:var(--text3);font-style:italic">Tie — both eliminated</span>' : ''}
+            </div>
+          </div>`).join('')}
+        ${round.winner ? `
+          <div style="margin-top:12px;padding:10px 12px;background:rgba(0,230,118,.06);border-radius:8px;border-left:3px solid var(--green)">
+            <div style="font-size:10px;color:var(--green);font-family:var(--cond);text-transform:uppercase;margin-bottom:6px">🤴 Last Team Standing</div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${teamAvatarHtml(round.winner, 22)}
+              <span style="font-size:14px;font-weight:700;color:var(--green)">${round.winner}</span>
+            </div>
+          </div>` : `
+          <div style="margin-top:12px;padding:10px 12px;background:rgba(68,138,255,.05);border-radius:8px;border-left:3px solid var(--blue)">
+            <div style="font-size:10px;color:var(--blue);font-family:var(--cond);text-transform:uppercase;margin-bottom:8px">Still Alive (${round.finalAlive.length} teams)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${round.finalAlive.map(t => `
+                <div style="display:flex;align-items:center;gap:4px;background:rgba(68,138,255,.1);border:1px solid rgba(68,138,255,.2);border-radius:6px;padding:4px 8px">
+                  ${teamAvatarHtml(t, 16)}
+                  <span style="font-size:11px">${t}</span>
+                </div>`).join('')}
+            </div>
+          </div>`}
+      </div>
+    </div>`;
   });
 
   container.innerHTML = html || '<div style="color:var(--text3);padding:20px;text-align:center">No rounds completed yet.</div>';
