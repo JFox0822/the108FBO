@@ -74,6 +74,9 @@ print('Fetching schedule...')
 schedule = []
 matchup_list = []
 
+# Debug: print raw response from first successful matchup endpoint
+_debug_printed = False
+
 # Try multiple endpoints to get the schedule
 for endpoint, params in [
     ('/fxea/general/getMatchups', {'season': 2026}),
@@ -96,6 +99,9 @@ for endpoint, params in [
                     break
     if matchup_list:
         print(f'  Got {len(matchup_list)} matchups from {endpoint}')
+        if not _debug_printed and matchup_list:
+            print(f'  DEBUG first matchup keys: {list(matchup_list[0].keys()) if isinstance(matchup_list[0], dict) else matchup_list[0]}')
+            _debug_printed = True
         break
 
 for m in matchup_list:
@@ -119,6 +125,66 @@ for m in matchup_list:
     })
 schedule.sort(key=lambda w: w['period'])
 print(f'  Schedule: {len(schedule)} weeks built')
+
+# ── SCORES: hit the scoreboard endpoint for each period that exists ──
+print('Fetching scores from scoreboard...')
+scores_found = 0
+for wk in schedule:
+    period = wk['period']
+    # Fantrax scoreboard endpoint — returns category wins per team per period
+    for score_endpoint, score_params in [
+        ('/fxea/general/getScoreboard', {'period': period, 'season': 2026}),
+        ('/fxea/general/getMatchupResults', {'period': period, 'season': 2026}),
+        ('/fxea/general/getTeamMatchupInfo', {'period': period, 'season': 2026}),
+    ]:
+        raw = get(score_endpoint, score_params)
+        if not raw:
+            continue
+        # Fantrax scoreboard typically returns a list of matchup objects or a dict with matchupList
+        rows = []
+        if isinstance(raw, list):
+            rows = raw
+        elif isinstance(raw, dict):
+            for k in ['matchupList', 'matchups', 'scoreboard', 'results']:
+                v = raw.get(k)
+                if isinstance(v, list) and v:
+                    rows = v
+                    break
+        if not rows:
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            # Try to identify away/home team ids
+            away_id = (row.get('awayTeamId') or
+                       (row.get('away', {}).get('id') if isinstance(row.get('away'), dict) else None))
+            home_id = (row.get('homeTeamId') or
+                       (row.get('home', {}).get('id') if isinstance(row.get('home'), dict) else None))
+            if not away_id or not home_id:
+                continue
+            # Score could be category wins or total points — grab whichever is available
+            away_score = (row.get('awayScore') or row.get('awayPoints') or
+                          row.get('awayCatWins') or
+                          (row.get('away', {}).get('score') if isinstance(row.get('away'), dict) else None) or
+                          (row.get('away', {}).get('catWins') if isinstance(row.get('away'), dict) else None))
+            home_score = (row.get('homeScore') or row.get('homePoints') or
+                          row.get('homeCatWins') or
+                          (row.get('home', {}).get('score') if isinstance(row.get('home'), dict) else None) or
+                          (row.get('home', {}).get('catWins') if isinstance(row.get('home'), dict) else None))
+            if away_score is None and home_score is None:
+                continue
+            # Find matching matchup in this week and update scores
+            for m in wk['matchupList']:
+                if m['away']['id'] == away_id and m['home']['id'] == home_id:
+                    m['awayScore'] = away_score
+                    m['homeScore'] = home_score
+                    scores_found += 1
+                    break
+        if scores_found > 0:
+            print(f'  Period {period}: scores found via {score_endpoint}')
+            break  # Got what we need for this period
+
+print(f'  Total scores filled: {scores_found}')
 
 print('Fetching standings...')
 standings_raw = get('/fxea/general/getStandings')
@@ -194,7 +260,7 @@ else:
 data = {
     'meta': {
         'season':      2026,
-        'updatedDate': datetime.now().strftime('%b %d, %Y %I:%M %p'),
+        'updatedDate': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
         'leagueId':    LID,
     },
     'rosters':      rosters,
