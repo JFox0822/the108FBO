@@ -71,23 +71,54 @@ for team_id, team_data in rosters_raw.get('rosters', {}).items():
     }
 
 print('Fetching schedule...')
-league_info = get('/fxea/general/getLeagueInfo')
 schedule = []
-for m in league_info.get('matchupList', []):
-    period = m.get('period', 0)
+matchup_list = []
+
+# Try multiple endpoints to get the schedule
+for endpoint, params in [
+    ('/fxea/general/getMatchups', {'season': 2026}),
+    ('/fxea/general/getLeagueInfo', {}),
+    ('/fxea/general/getSchedule', {'season': 2026}),
+]:
+    raw = get(endpoint, params)
+    if isinstance(raw, list):
+        matchup_list = raw
+    elif isinstance(raw, dict):
+        for key in ['matchupList', 'matchups', 'schedule']:
+            val = raw.get(key)
+            if isinstance(val, list) and val:
+                matchup_list = val
+                break
+            elif isinstance(val, dict):
+                inner = val.get('matchupList', [])
+                if inner:
+                    matchup_list = inner
+                    break
+    if matchup_list:
+        print(f'  Got {len(matchup_list)} matchups from {endpoint}')
+        break
+
+for m in matchup_list:
+    if not isinstance(m, dict): continue
+    period = m.get('period', m.get('scoringPeriod', m.get('week', 0)))
     wk = next((w for w in schedule if w['period'] == period), None)
     if not wk:
         wk = {'period': period, 'matchupList': []}
         schedule.append(wk)
-    away_id  = m.get('awayTeamId', '')
-    home_id  = m.get('homeTeamId', '')
+    away_id  = m.get('awayTeamId', m.get('away', {}).get('id', '') if isinstance(m.get('away'), dict) else '')
+    home_id  = m.get('homeTeamId', m.get('home', {}).get('id', '') if isinstance(m.get('home'), dict) else '')
     away_meta = TEAMS.get(away_id, {})
     home_meta  = TEAMS.get(home_id, {})
+    away_score = m.get('awayScore', m.get('awayPoints', m.get('awayCatWins', None)))
+    home_score = m.get('homeScore', m.get('homePoints', m.get('homeCatWins', None)))
     wk['matchupList'].append({
         'away': {'id': away_id, 'name': away_meta.get('name', away_id), 'shortName': away_meta.get('owner', '?')},
         'home': {'id': home_id, 'name': home_meta.get('name', home_id), 'shortName': home_meta.get('owner', '?')},
+        'awayScore': away_score,
+        'homeScore': home_score,
     })
 schedule.sort(key=lambda w: w['period'])
+print(f'  Schedule: {len(schedule)} weeks built')
 
 print('Fetching standings...')
 standings_raw = get('/fxea/general/getStandings')
