@@ -123,10 +123,10 @@ if raw_matchups:
             schedule.append({'period': period, 'matchupList': period_matchups})
 
 # ── FETCH SCORES for each period via scoreboard ──
-# leagueInfo gives us the schedule (who plays who) but no scores.
-# Scoreboard endpoint has the actual category win scores.
 print('Fetching scores from scoreboard...')
 scores_filled = 0
+CAT_KEYS = ['R','HR','RBI','K_bat','SB','AVG','OPS','IP','H_pit','K_pit','QS','ERA','WHIP','SVH']
+
 for wk in schedule:
     period = wk['period']
     for ep, params in [
@@ -138,28 +138,40 @@ for wk in schedule:
         if not raw: continue
         rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
         if not rows: continue
+        found_any = False
         for row in rows:
             if not isinstance(row, dict): continue
-            # Try every known field name variant for team IDs
             aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id',''))
             hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id',''))
             if not aid or not hid: continue
-            # Find matching matchup in this week and update scores
             for m in wk['matchupList']:
                 if m['away']['id'] == aid and m['home']['id'] == hid:
+                    away_obj = row.get('away', {}) or {}
+                    home_obj  = row.get('home', {}) or {}
                     away_s = (row.get('awayScore') or row.get('awayCatWins') or
-                              (row.get('away') or {}).get('score') or
-                              (row.get('away') or {}).get('catWins'))
+                              away_obj.get('score') or away_obj.get('catWins'))
                     home_s = (row.get('homeScore') or row.get('homeCatWins') or
-                              (row.get('home') or {}).get('score') or
-                              (row.get('home') or {}).get('catWins'))
+                              home_obj.get('score') or home_obj.get('catWins'))
                     if away_s is not None or home_s is not None:
                         m['awayScore'] = away_s
                         m['homeScore'] = home_s
                         scores_filled += 1
+                        found_any = True
+                    # Per-category stats — try common key variants
+                    cats = (row.get('categoryStats') or row.get('categories') or
+                            row.get('stats') or row.get('catStats'))
+                    if cats and isinstance(cats, dict):
+                        m['categories'] = cats
+                    elif away_obj.get('stats') or away_obj.get('categoryStats'):
+                        # Stats stored per-team: build combined dict
+                        a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
+                        h_stats = home_obj.get('stats') or home_obj.get('categoryStats') or {}
+                        if a_stats or h_stats:
+                            m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
+                                               for k in set(list(a_stats.keys()) + list(h_stats.keys()))}
                     break
-        if scores_filled > 0:
-            break  # got scores from this endpoint, move to next week
+        if found_any:
+            break
 
 print(f'  {len(schedule)} weeks in schedule · {scores_filled} scores filled')
 
