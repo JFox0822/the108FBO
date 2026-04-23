@@ -175,12 +175,22 @@ body::before {
 /* Legacy ntab — hidden, kept for compatibility */
 .ntab { display: none; }
 .nav-updated {
-  flex-shrink: 0; display: none; align-items: center; gap: 6px;
-  font-family: var(--mono); font-size: 10px; color: var(--text3);
+  flex-shrink: 0; display: none; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: var(--text2);
   background: var(--card); border: 1px solid var(--border);
-  padding: 4px 10px; border-radius: 20px;
+  padding: 5px 12px; border-radius: 20px;
 }
 @media (min-width: 740px) { .nav-updated { display: flex; } }
+.nav-updated.error { border-color: rgba(255,82,82,.4); color: var(--red); }
+.nav-updated.error .live-dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.nav-refresh-btn {
+  background: transparent; border: none; color: var(--text3);
+  cursor: pointer; padding: 2px 4px; font-size: 13px;
+  transition: color .15s, transform .3s;
+  display: flex; align-items: center;
+}
+.nav-refresh-btn:hover { color: var(--green); }
+.nav-refresh-btn.spinning { animation: spin 1s linear infinite; color: var(--green); }
 .live-dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--green); box-shadow: 0 0 6px var(--green);
@@ -857,9 +867,10 @@ select:focus, input:focus {
       <button class="nav-group-btn" id="grp-tools"  onclick="selectGroup('tools')">Tools</button>
       <button class="nav-group-btn" id="grp-vault"  onclick="selectGroup('vault')">Vault</button>
     </div>
-    <div class="nav-updated">
+    <div class="nav-updated" id="nav-updated">
       <div class="live-dot"></div>
-      <span id="updated-text">Loading...</span>
+      <span id="updated-text">Loading…</span>
+      <button class="nav-refresh-btn" id="refresh-btn" onclick="manualRefresh()" title="Refresh now">↻</button>
     </div>
   </div>
 
@@ -1380,56 +1391,89 @@ window.APP = {
 };
 
 // ── INIT ────────────────────────────────────────
-async function initApp(isRefresh = false) {
+// ── TIMESTAMP HELPERS ──────────────────────────
+function relativeTime(iso) {
   try {
-    // data.json is required; history.json is optional (graceful fallback)
-    const dataRes = await fetch('data.json?t=' + Date.now());
-    if (!dataRes.ok) throw new Error(`data.json returned ${dataRes.status}`);
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const mins = Math.floor((now - then) / 60000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return mins + ' min ago';
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return hrs + ' hr ago';
+    return Math.floor(hrs / 24) + ' d ago';
+  } catch(e) { return '—'; }
+}
+
+function formatTimestamp(iso) {
+  if (!iso) return 'Never';
+  try {
+    const d = new Date(iso);
+    const abs = d.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true
+    });
+    return `${relativeTime(iso)} · ${abs} ET`;
+  } catch(e) { return iso; }
+}
+
+// Tick relative time every 30s so "2 min ago" stays fresh
+setInterval(() => {
+  if (APP.data?.meta?.updatedDate) {
+    const el = document.getElementById('updated-text');
+    if (el) el.textContent = formatTimestamp(APP.data.meta.updatedDate);
+  }
+}, 30 * 1000);
+
+async function manualRefresh() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.classList.add('spinning');
+  await initApp(true);
+  setTimeout(() => btn?.classList.remove('spinning'), 600);
+}
+
+async function initApp(isRefresh = false) {
+  const updatedEl = document.getElementById('updated-text');
+  const wrapEl = document.getElementById('nav-updated');
+  try {
+    // Aggressive cache-busting: random hash + timestamp, bypasses CDN cache
+    const bust = Date.now() + '-' + Math.random().toString(36).slice(2);
+    const dataRes = await fetch('data.json?v=' + bust, { cache: 'no-store' });
+    if (!dataRes.ok) throw new Error(`data.json HTTP ${dataRes.status}`);
     APP.data = await dataRes.json();
 
-    // history.json — load if available, skip silently if not
+    // history.json — optional
     try {
-      const histRes = await fetch('history.json?t=' + Date.now());
+      const histRes = await fetch('history.json?v=' + bust, { cache: 'no-store' });
       if (histRes.ok) APP.history = await histRes.json();
-    } catch(e) { /* history.json missing — historical tabs will show empty state */ }
+    } catch(e) { /* optional */ }
 
     APP.loaded = true;
 
-    // Build color map from roster order
     Object.values(APP.data.rosters || {}).forEach((t, i) => {
       if (!TEAM_COLORS[t.name]) {
         TEAM_COLORS[t.name] = TEAM_COLORS_FALLBACK[i % TEAM_COLORS_FALLBACK.length];
       }
     });
 
-    // Update nav timestamp
-    const rawUpdated = APP.data.meta?.updatedDate;
-    let updatedDisplay = 'Unknown';
-    if (rawUpdated) {
-      try {
-        const d = new Date(rawUpdated);
-        updatedDisplay = d.toLocaleString('en-US', {
-          timeZone: 'America/New_York',
-          month: 'short', day: 'numeric',
-          hour: 'numeric', minute: '2-digit',
-          hour12: true
-        }) + ' ET';
-      } catch(e) { updatedDisplay = rawUpdated; }
-    }
-    document.getElementById('updated-text').textContent = updatedDisplay;
+    // Success state
+    if (wrapEl) wrapEl.classList.remove('error');
+    if (updatedEl) updatedEl.textContent = formatTimestamp(APP.data.meta?.updatedDate);
 
-    // Re-render active page (on refresh, silently re-render in background)
     const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
     if (activePage) renderPage(activePage);
 
   } catch (e) {
-    console.error('Failed to load data:', e);
+    console.error('[108FBO] Failed to load data.json:', e);
+    if (wrapEl) wrapEl.classList.add('error');
+    if (updatedEl) updatedEl.textContent = 'No data — ' + e.message;
     if (!isRefresh) {
-      document.getElementById('updated-text').textContent = 'No data yet';
-      // Show a friendly message in the standings table if it's the first load
       const tb = document.getElementById('standings-tbody');
-      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3);font-size:13px">
-        ⏳ Waiting for first data refresh — check back shortly, or trigger a manual run in GitHub Actions.
+      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3);font-size:13px;line-height:1.7">
+        ⏳ <strong style="color:var(--red)">data.json not loaded</strong><br>
+        <span style="font-size:11px">${e.message}</span><br>
+        <span style="font-size:11px">Trigger a manual run in GitHub Actions, then click the ↻ button above.</span>
       </td></tr>`;
     }
   }
