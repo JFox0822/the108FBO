@@ -102,34 +102,69 @@ body::before {
   display: none;
 }
 @media (min-width: 380px) { .nav-title { display: block; } }
-.nav-tabs {
-  flex: 1; overflow-x: auto; scrollbar-width: none;
-  display: none; gap: 2px; padding: 6px 0;
+/* ── GROUPED NAV ── */
+.nav-groups {
+  flex: 1; display: none; gap: 2px; align-items: center; padding: 6px 0;
 }
-@media (min-width: 740px) { .nav-tabs { display: flex; } }
-.nav-tabs::-webkit-scrollbar { display: none; }
-.ntab {
-  flex-shrink: 0; white-space: nowrap;
+@media (min-width: 740px) { .nav-groups { display: flex; } }
+
+.nav-group { position: relative; }
+
+.nav-group-btn {
   padding: 8px 14px; border-radius: 8px;
   border: 1px solid transparent; background: transparent;
   color: var(--text3); font-size: 13px; font-weight: 500;
   transition: all .15s; cursor: pointer; min-height: 36px;
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; font-family: var(--font);
 }
-.ntab:hover { color: var(--text); background: rgba(255,255,255,.05); border-color: var(--border); }
-.ntab.active {
-  background: var(--green-dim);
-  color: var(--green);
-  border: 1px solid rgba(0,230,118,.3);
-  font-weight: 600;
+.nav-group-btn:hover { color: var(--text); background: rgba(255,255,255,.05); border-color: var(--border); }
+.nav-group-btn.active {
+  background: var(--green-dim); color: var(--green);
+  border: 1px solid rgba(0,230,118,.3); font-weight: 600;
 }
-.tab-num {
-  font-size: 9px; font-family: var(--mono); color: var(--text3);
-  background: rgba(255,255,255,.07); border-radius: 3px;
-  padding: 1px 4px; min-width: 16px; text-align: center;
-  flex-shrink: 0;
+.nav-group-btn .g-caret {
+  font-size: 7px; opacity: .5; transition: transform .15s;
 }
-.ntab.active .tab-num { background: rgba(0,230,118,.15); color: var(--green); }
+.nav-group:hover .nav-group-btn .g-caret { transform: rotate(180deg); opacity: .8; }
+
+/* Dropdown panel */
+.nav-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0;
+  min-width: 190px;
+  background: var(--card2);
+  border: 1px solid var(--border2); border-radius: 10px;
+  padding: 5px; box-shadow: 0 8px 40px rgba(0,0,0,.6);
+  opacity: 0; pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity .15s, transform .15s;
+  z-index: 400;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.nav-group:hover .nav-dropdown {
+  opacity: 1; pointer-events: all; transform: translateY(0);
+}
+
+.nav-drop-item {
+  padding: 8px 12px; border-radius: 7px;
+  font-size: 13px; color: var(--text2);
+  cursor: pointer; transition: all .12s;
+  border: none; background: transparent;
+  text-align: left; white-space: nowrap;
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--font); width: 100%;
+}
+.nav-drop-item:hover { background: rgba(255,255,255,.06); color: var(--text); }
+.nav-drop-item.active { color: var(--green); background: var(--green-dim); font-weight: 600; }
+.nav-drop-item .di-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+
+/* Divider inside dropdown */
+.nav-drop-sep {
+  height: 1px; background: var(--border); margin: 3px 0;
+}
+
+/* Legacy ntab kept for mobile select sync compatibility */
+.ntab { display: none; }
 .nav-updated {
   flex-shrink: 0; display: none; align-items: center; gap: 6px;
   font-family: var(--mono); font-size: 10px; color: var(--text3);
@@ -805,25 +840,57 @@ select:focus, input:focus {
       <div class="nav-logo">108</div>
       <div class="nav-title">THE 108 FBO</div>
     </a>
-    <div class="nav-tabs">
-      <button class="ntab active" data-page="standings"><span class="tab-num">1</span>Standings</button>
-      <button class="ntab" data-page="matchups"><span class="tab-num">2</span>Matchups</button>
-      <button class="ntab" data-page="rosters"><span class="tab-num">3</span>Rosters</button>
-      <button class="ntab" data-page="power"><span class="tab-num">4</span>Power Rankings</button>
-      <button class="ntab" data-page="legacy"><span class="tab-num">5</span>Legacy</button>
-      <button class="ntab" data-page="waiver"><span class="tab-num">6</span>Waiver Wire</button>
-      <button class="ntab" data-page="trade"><span class="tab-num">7</span>Trade Analyzer</button>
-      <button class="ntab" data-page="awards"><span class="tab-num">8</span>Awards</button>
-      <button class="ntab" data-page="articles"><span class="tab-num">9</span>Articles</button>
-      <button class="ntab" data-page="resumes"><span class="tab-num">10</span>Resumes</button>
-      <button class="ntab" data-page="championships"><span class="tab-num">11</span>Championships</button>
-      <button class="ntab" data-page="records"><span class="tab-num">12</span>Records</button>
-      <button class="ntab" data-page="h2h"><span class="tab-num">13</span>H2H</button>
-      <button class="ntab" data-page="luck"><span class="tab-num">14</span>Luck Index</button>
-      <button class="ntab" data-page="stats"><span class="tab-num">15</span>All-Time Stats</button>
-      <button class="ntab" data-page="outliers"><span class="tab-num">16</span>Outliers</button>
-      <button class="ntab" data-page="catking"><span class="tab-num">17</span>Cat Kings</button>
-      <button class="ntab" data-page="koh"><span class="tab-num">18</span>King of the Hill</button>
+    <div class="nav-groups" id="nav-groups">
+
+      <!-- Season -->
+      <div class="nav-group">
+        <button class="nav-group-btn" id="grp-season">Season <span class="g-caret">▼</span></button>
+        <div class="nav-dropdown">
+          <button class="nav-drop-item" data-page="standings"><span class="di-icon">📊</span>Standings</button>
+          <button class="nav-drop-item" data-page="matchups"><span class="di-icon">⚔️</span>Matchups</button>
+          <button class="nav-drop-item" data-page="power"><span class="di-icon">⚡</span>Power Rankings</button>
+          <div class="nav-drop-sep"></div>
+          <button class="nav-drop-item" data-page="catking"><span class="di-icon">👑</span>Cat Kings</button>
+          <button class="nav-drop-item" data-page="koh"><span class="di-icon">🏔️</span>King of the Hill</button>
+          <button class="nav-drop-item" data-page="luck"><span class="di-icon">🍀</span>Luck Index</button>
+        </div>
+      </div>
+
+      <!-- Teams -->
+      <div class="nav-group">
+        <button class="nav-group-btn" id="grp-teams">Teams <span class="g-caret">▼</span></button>
+        <div class="nav-dropdown">
+          <button class="nav-drop-item" data-page="rosters"><span class="di-icon">🧢</span>Rosters</button>
+          <button class="nav-drop-item" data-page="legacy"><span class="di-icon">📈</span>Legacy Rankings</button>
+          <button class="nav-drop-item" data-page="resumes"><span class="di-icon">📋</span>Owner Resumes</button>
+        </div>
+      </div>
+
+      <!-- Tools -->
+      <div class="nav-group">
+        <button class="nav-group-btn" id="grp-tools">Tools <span class="g-caret">▼</span></button>
+        <div class="nav-dropdown">
+          <button class="nav-drop-item" data-page="waiver"><span class="di-icon">🎯</span>Waiver Wire</button>
+          <button class="nav-drop-item" data-page="trade"><span class="di-icon">🔄</span>Trade Analyzer</button>
+          <div class="nav-drop-sep"></div>
+          <button class="nav-drop-item" data-page="articles"><span class="di-icon">📰</span>Articles</button>
+        </div>
+      </div>
+
+      <!-- Vault -->
+      <div class="nav-group">
+        <button class="nav-group-btn" id="grp-vault">Vault <span class="g-caret">▼</span></button>
+        <div class="nav-dropdown">
+          <button class="nav-drop-item" data-page="championships"><span class="di-icon">🏆</span>Championships</button>
+          <button class="nav-drop-item" data-page="h2h"><span class="di-icon">🔀</span>H2H Matrix</button>
+          <button class="nav-drop-item" data-page="stats"><span class="di-icon">📉</span>All-Time Stats</button>
+          <button class="nav-drop-item" data-page="records"><span class="di-icon">🗃️</span>League Records</button>
+          <button class="nav-drop-item" data-page="outliers"><span class="di-icon">🔥</span>Outliers</button>
+          <div class="nav-drop-sep"></div>
+          <button class="nav-drop-item" data-page="awards"><span class="di-icon">💩</span>AOTW Awards</button>
+        </div>
+      </div>
+
     </div>
     <div class="nav-updated">
       <div class="live-dot"></div>
@@ -1352,14 +1419,33 @@ async function initApp() {
   }
 }
 
+// ── PAGE → GROUP MAP ────────────────────────────
+const PAGE_GROUP = {
+  standings:'season', matchups:'season', power:'season',
+  catking:'season', koh:'season', luck:'season',
+  rosters:'teams', legacy:'teams', resumes:'teams',
+  waiver:'tools', trade:'tools', articles:'tools',
+  championships:'vault', h2h:'vault', stats:'vault',
+  records:'vault', outliers:'vault', awards:'vault',
+};
+
 // ── NAVIGATION ──────────────────────────────────
-function navTo(name, btn, isMobile = false) {
+function navTo(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
-  document.querySelectorAll('.ntab').forEach(b => {
+
+  // Update dropdown items
+  document.querySelectorAll('.nav-drop-item').forEach(b => {
     b.classList.toggle('active', b.dataset.page === name);
   });
+
+  // Update group buttons
+  const group = PAGE_GROUP[name];
+  document.querySelectorAll('.nav-group-btn').forEach(b => {
+    b.classList.toggle('active', b.id === 'grp-' + group);
+  });
+
   // Sync mobile dropdown
   const msel = document.getElementById('mobile-nav-select');
   if (msel) msel.value = name;
@@ -1367,16 +1453,7 @@ function navTo(name, btn, isMobile = false) {
   if (APP.loaded) renderPage(name);
 }
 
-function goMobile(name) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  const page = document.getElementById('page-' + name);
-  if (page) page.classList.add('active');
-  document.querySelectorAll('.ntab').forEach(b => {
-    b.classList.toggle('active', b.dataset.page === name);
-  });
-  window.scrollTo(0, 0);
-  if (APP.loaded) renderPage(name);
-}
+function goMobile(name) { navTo(name); }
 
 function renderPage(name) {
   switch (name) {
@@ -1595,14 +1672,16 @@ function emptyHtml(msg = 'No data available yet.') {
 
 // ── KICK OFF ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Wire top nav buttons
-  document.querySelectorAll('.ntab').forEach(btn => {
-    btn.addEventListener('click', () => navTo(btn.dataset.page, btn, false));
+  // Wire dropdown nav items
+  document.querySelectorAll('.nav-drop-item').forEach(btn => {
+    btn.addEventListener('click', () => navTo(btn.dataset.page));
   });
-  // Wire bottom nav buttons
+  // Wire bottom nav buttons (legacy bnav-btn)
   document.querySelectorAll('.bnav-btn').forEach(btn => {
-    btn.addEventListener('click', () => navTo(btn.dataset.page, btn, true));
+    btn.addEventListener('click', () => navTo(btn.dataset.page));
   });
+  // Set initial state — standings is active
+  navTo('standings');
   const sv = document.getElementById('stats-view');
   if (sv) sv.addEventListener('change', () => {
     const w = document.getElementById('stats-team-wrap');
@@ -2674,14 +2753,40 @@ async function analyzeWaiverMove() {
   </div>`;
 
   // AI enhancement
-  
-
   out.innerHTML = html;
+
+  // Claude AI waiver analysis
+  out.innerHTML += `<div class="ai-thinking" id="ai-waiver-thinking" style="margin-top:12px;padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)"><div class="ai-spinner"></div><span>Getting AI recommendation...</span></div>`;
+  try {
+    const addName = add.name + ' (' + add.pos + ', ADP ' + (add.adp || '?') + ')';
+    const dropName = drop.name + ' (' + drop.pos + ', ADP ' + (drop.adp || '?') + ')';
+    const strengths = eliteCats.join(', ') || 'none identified';
+    const weaknesses = weakCats.join(', ') || 'none identified';
+    const teamName = myTeam?.name || 'your team';
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system: `You are a dynasty fantasy baseball analyst for "The 108 FBO" league.
+Scoring: H2H Categories — Batting: R, HR, RBI, K(bat), SB, AVG, OPS. Pitching: IP, H, K, QS, ERA, WHIP, SV+HLD. 27-man rosters. Dynasty format.
+Be direct, opinionated. 2-3 sentences max.`,
+        messages: [{ role: 'user', content: `Dynasty waiver move for ${teamName}:\nADD: ${addName}\nDROP: ${dropName}\nTeam strengths: ${strengths}\nTeam weaknesses: ${weaknesses}\n\nShould they make this move? Quick verdict.` }]
+      })
+    });
+    const aiData = await aiRes.json();
+    const aiText = aiData.content?.[0]?.text || 'AI analysis unavailable.';
+    document.getElementById('ai-waiver-thinking').outerHTML = `
+      <div style="margin-top:12px;padding:14px 16px;background:var(--card);border-radius:10px;border:1px solid rgba(0,230,118,.2)">
+        <div style="font-size:10px;font-family:var(--cond);color:var(--green);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🤖 AI Take</div>
+        <div style="font-size:13px;line-height:1.75">${aiText}</div>
+      </div>`;
+  } catch(e) {
+    const el = document.getElementById('ai-waiver-thinking');
+    if (el) el.remove();
+  }
 }
-
-
-/* ═══════════════════════════════════════════════
-   TRADE ANALYZER
    ═══════════════════════════════════════════════ */
 
 let tradePlayers = { give: [], get: [] };
@@ -2931,7 +3036,37 @@ async function analyzeTrade() {
     </div>
   </div>`;
 
+  out.classList.add('visible');
   out.innerHTML = html;
+
+  // ── AI ANALYSIS via Claude API ──
+  out.innerHTML += `<div class="ai-thinking" id="ai-trade-thinking" style="margin-top:14px;padding:12px;background:var(--card);border-radius:8px;border:1px solid var(--border)"><div class="ai-spinner"></div><span>Getting AI analysis...</span></div>`;
+  try {
+    const giveStr = give.map(p => `${p.name} (${p.pos}, ADP ${p.adp || '?'})`).join(', ');
+    const getStr  = get.map(p => `${p.name} (${p.pos}, ADP ${p.adp || '?'})`).join(', ');
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 400,
+        system: `You are a dynasty fantasy baseball analyst for "The 108 FBO" league. 
+Scoring: H2H Categories — Batting: R, HR, RBI, K(bat), SB, AVG, OPS. Pitching: IP, H, K, QS, ERA, WHIP, SV+HLD.
+27-man rosters. Dynasty format so long-term value matters. Be direct and specific. Max 3 short paragraphs.`,
+        messages: [{ role: 'user', content: `Evaluate this dynasty trade from the giving team's perspective:\nGIVING: ${giveStr}\nRECEIVING: ${getStr}\n\nQuick verdict + 1-2 sentences on dynasty value and category impact. Keep it punchy.` }]
+      })
+    });
+    const aiData = await aiRes.json();
+    const aiText = aiData.content?.[0]?.text || 'AI analysis unavailable.';
+    document.getElementById('ai-trade-thinking').outerHTML = `
+      <div style="margin-top:14px;padding:14px 16px;background:var(--card);border-radius:10px;border:1px solid rgba(68,138,255,.25)">
+        <div style="font-size:10px;font-family:var(--cond);color:var(--blue);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">🤖 AI Analysis</div>
+        <div style="font-size:13px;line-height:1.75;white-space:pre-wrap">${aiText}</div>
+      </div>`;
+  } catch(e) {
+    const el = document.getElementById('ai-trade-thinking');
+    if (el) el.outerHTML = `<div style="font-size:11px;color:var(--text3);margin-top:8px;padding:8px">AI analysis unavailable.</div>`;
+  }
 
   btn.disabled = false; btn.textContent = 'Analyze Trade';
 }
