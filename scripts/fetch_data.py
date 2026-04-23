@@ -122,39 +122,46 @@ if raw_matchups:
         if period_matchups:
             schedule.append({'period': period, 'matchupList': period_matchups})
 
-# Fallback: scoreboard per period
-if not schedule:
-    print('  Trying scoreboard fallback...')
-    empty = 0
-    for period in range(1, 27):
-        found = False
-        for ep, params in [
-            ('/fxea/general/getScoreboard', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
-            ('/fxea/general/getScoreboard', {'period': period}),
-        ]:
-            raw = get(ep, params)
-            rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
-            if not rows: continue
-            pm = []
-            for row in rows:
-                if not isinstance(row, dict): continue
-                aid, hid = row.get('awayTeamId',''), row.get('homeTeamId','')
-                if not aid or not hid: continue
-                pm.append({
-                    'away': {'id': aid, 'name': TEAMS.get(aid,{}).get('name',aid),
-                             'shortName': TEAMS.get(aid,{}).get('owner','?')},
-                    'home': {'id': hid, 'name': TEAMS.get(hid,{}).get('name',hid),
-                             'shortName': TEAMS.get(hid,{}).get('owner','?')},
-                    'awayScore': row.get('awayScore'), 'homeScore': row.get('homeScore'),
-                })
-            if pm:
-                schedule.append({'period': period, 'matchupList': pm})
-                found = True; empty = 0; break
-        if not found:
-            empty += 1
-            if empty >= 3 and period > 3: break
+# ── FETCH SCORES for each period via scoreboard ──
+# leagueInfo gives us the schedule (who plays who) but no scores.
+# Scoreboard endpoint has the actual category win scores.
+print('Fetching scores from scoreboard...')
+scores_filled = 0
+for wk in schedule:
+    period = wk['period']
+    for ep, params in [
+        ('/fxea/general/getScoreboard', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
+        ('/fxea/general/getScoreboard', {'period': period, 'season': 2026}),
+        ('/fxea/general/getTeamMatchupInfo', {'scoringPeriod': period}),
+    ]:
+        raw = get(ep, params)
+        if not raw: continue
+        rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
+        if not rows: continue
+        for row in rows:
+            if not isinstance(row, dict): continue
+            # Try every known field name variant for team IDs
+            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id',''))
+            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id',''))
+            if not aid or not hid: continue
+            # Find matching matchup in this week and update scores
+            for m in wk['matchupList']:
+                if m['away']['id'] == aid and m['home']['id'] == hid:
+                    away_s = (row.get('awayScore') or row.get('awayCatWins') or
+                              (row.get('away') or {}).get('score') or
+                              (row.get('away') or {}).get('catWins'))
+                    home_s = (row.get('homeScore') or row.get('homeCatWins') or
+                              (row.get('home') or {}).get('score') or
+                              (row.get('home') or {}).get('catWins'))
+                    if away_s is not None or home_s is not None:
+                        m['awayScore'] = away_s
+                        m['homeScore'] = home_s
+                        scores_filled += 1
+                    break
+        if scores_filled > 0:
+            break  # got scores from this endpoint, move to next week
 
-print(f'  {len(schedule)} weeks in schedule')
+print(f'  {len(schedule)} weeks in schedule · {scores_filled} scores filled')
 
 # ── STANDINGS ─────────────────────────────────────
 print('Fetching standings...')
