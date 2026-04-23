@@ -410,23 +410,72 @@ select:focus, input:focus {
 .btn-full { width: 100%; padding: 12px; font-size: 14px; border-radius: 10px; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
-/* ── MATCHUP CARDS ── */
+/* ── MATCHUP CARDS (ESPN-style) ── */
 .matchup-card {
   background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--r2); padding: 14px 16px;
+  border-radius: var(--r2); overflow: hidden;
 }
-.matchup-card.is-you { border-color: rgba(68,138,255,.4); }
-.matchup-teams {
-  display: grid; grid-template-columns: 1fr 52px 1fr;
-  align-items: center; gap: 8px;
+.matchup-card.is-you { border-color: rgba(68,138,255,.5); }
+.mc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; background: rgba(255,255,255,.03);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--cond); font-size: 10px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--text3);
 }
-.mt-away { display: flex; flex-direction: column; }
-.mt-home { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
-.mt-name { font-weight: 600; font-size: 13px; line-height: 1.3; }
-.mt-owner { font-size: 11px; color: var(--text3); }
-.mt-score { font-family: var(--display); font-size: 22px; color: var(--accent); text-align: center; line-height: 1; }
-.mt-week { font-size: 10px; color: var(--text3); font-family: var(--cond); text-align: center; letter-spacing: .5px; }
-.mt-vs { font-family: var(--display); font-size: 16px; color: var(--text3); text-align: center; }
+.mc-header .mc-leading { color: var(--green); font-weight: 700; }
+.mc-teams {
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: center; gap: 12px; padding: 14px 16px 10px;
+}
+.mc-team-away { display: flex; flex-direction: column; }
+.mc-team-home { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.mc-team-name { font-weight: 700; font-size: 13px; line-height: 1.3; }
+.mc-team-owner { font-size: 11px; color: var(--text3); }
+.mc-score-block { text-align: center; }
+.mc-score {
+  font-family: var(--display); font-size: 30px; line-height: 1;
+  display: flex; align-items: center; gap: 6px;
+}
+.mc-score-a { }
+.mc-score-sep { color: var(--text3); font-size: 18px; }
+.mc-score-b { }
+.mc-status { font-size: 9px; color: var(--text3); font-family: var(--cond); letter-spacing: .5px; margin-top: 2px; }
+.mc-vs { font-family: var(--display); font-size: 15px; color: var(--text3); }
+/* Win probability bar */
+.mc-prob {
+  padding: 0 16px 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.mc-prob-pct { font-family: var(--mono); font-size: 11px; font-weight: 700; min-width: 34px; }
+.mc-prob-bar { flex: 1; height: 5px; background: var(--card2); border-radius: 3px; overflow: hidden; }
+.mc-prob-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--green), var(--blue)); }
+/* Category rows */
+.mc-cats { padding: 0 14px 12px; }
+.mc-cats-label {
+  font-family: var(--cond); font-size: 9px; color: var(--text3);
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 8px 0 4px; border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.mc-cat-row {
+  display: grid; grid-template-columns: 52px 1fr 36px 1fr 52px;
+  align-items: center; gap: 4px; padding: 2px 0;
+  font-size: 11px;
+}
+.mc-cat-row .val-a { text-align: right; font-family: var(--mono); font-size: 11px; }
+.mc-cat-row .val-b { text-align: left; font-family: var(--mono); font-size: 11px; }
+.mc-cat-row .cat-name {
+  text-align: center; font-family: var(--cond); font-size: 9px;
+  color: var(--text3); letter-spacing: .5px;
+}
+.mc-cat-row .bar-wrap {
+  height: 4px; background: var(--card2); border-radius: 2px; overflow: hidden;
+}
+.mc-cat-row .bar-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+.win-val { color: var(--green); font-weight: 700; }
+.lose-val { color: var(--text3); }
+.tie-val { color: var(--accent); }
 
 /* ── POWER RANKING CARDS ── */
 .pr-card {
@@ -2091,126 +2140,177 @@ async function renderMatchups() {
 }
 
 // Scoring categories for The 108 FBO
-const CAT_DEFS = [
-  {key:'R',    label:'R',      hit:true,  lowerBetter:false},
-  {key:'HR',   label:'HR',     hit:true,  lowerBetter:false},
-  {key:'RBI',  label:'RBI',    hit:true,  lowerBetter:false},
-  {key:'K_bat',label:'K',      hit:true,  lowerBetter:true },
-  {key:'SB',   label:'SB',     hit:true,  lowerBetter:false},
-  {key:'AVG',  label:'AVG',    hit:true,  lowerBetter:false},
-  {key:'OPS',  label:'OPS',    hit:true,  lowerBetter:false},
-  {key:'IP',   label:'IP',     hit:false, lowerBetter:false},
-  {key:'H_pit',label:'H',      hit:false, lowerBetter:true },
-  {key:'K_pit',label:'K',      hit:false, lowerBetter:false},
-  {key:'QS',   label:'QS',     hit:false, lowerBetter:false},
-  {key:'ERA',  label:'ERA',    hit:false, lowerBetter:true },
-  {key:'WHIP', label:'WHIP',   hit:false, lowerBetter:true },
-  {key:'SVH',  label:'SV+HLD', hit:false, lowerBetter:false},
+// ── LIVE FANTRAX CATEGORY FETCH ──────────────────
+let liveScoreCache = {};
+
+async function fetchLiveCategoryData(period) {
+  if (liveScoreCache[period]) return liveScoreCache[period];
+  const base = 'https://www.fantrax.com/fxea/general/';
+  const lid  = 'ai1iqnl9mg6kvw0f';
+  for (const [ep, p] of [
+    ['getScoreboard', `leagueId=${lid}&scoringPeriod=${period}&timeframeType=BY_PERIOD`],
+    ['getScoreboard', `leagueId=${lid}&period=${period}&season=2026`],
+    ['getTeamMatchupInfo', `leagueId=${lid}&scoringPeriod=${period}`],
+  ]) {
+    try {
+      const r = await fetch(`${base}${ep}?${p}`, { headers: { Accept: 'application/json' } });
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (d && !d.error) { liveScoreCache[period] = d; return d; }
+    } catch(e) {}
+  }
+  return null;
+}
+
+function parseCatLookup(apiData) {
+  const lookup = {};
+  if (!apiData) return lookup;
+  const rows = Array.isArray(apiData) ? apiData : (apiData.matchupList || apiData.matchups || []);
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const aid = row.awayTeamId || row.away?.id || '';
+    const hid = row.homeTeamId || row.home?.id || '';
+    if (!aid || !hid) continue;
+    lookup[aid + '_' + hid] = {
+      away: row.away?.stats || row.away?.categoryStats || row.awayStats || {},
+      home: row.home?.stats || row.home?.categoryStats || row.homeStats || {},
+      aScore: row.awayScore || row.awayCatWins || row.away?.score || row.away?.catWins,
+      hScore: row.homeScore || row.homeCatWins || row.home?.score || row.home?.catWins,
+    };
+  }
+  return lookup;
+}
+
+const HIT_CATS = [
+  {key:'R',    label:'R',      low:false, fmt:v=>Math.round(v)+''},
+  {key:'HR',   label:'HR',     low:false, fmt:v=>Math.round(v)+''},
+  {key:'RBI',  label:'RBI',    low:false, fmt:v=>Math.round(v)+''},
+  {key:'SO',   label:'K',      low:true,  fmt:v=>Math.round(v)+''},
+  {key:'SB',   label:'SB',     low:false, fmt:v=>Math.round(v)+''},
+  {key:'AVG',  label:'AVG',    low:false, fmt:v=>(+v).toFixed(3)},
+  {key:'OPS',  label:'OPS',    low:false, fmt:v=>(+v).toFixed(3)},
+];
+const PIT_CATS = [
+  {key:'IP',   label:'IP',     low:false, fmt:v=>(+v).toFixed(1)},
+  {key:'HA',   label:'H',      low:true,  fmt:v=>Math.round(v)+''},
+  {key:'K',    label:'K',      low:false, fmt:v=>Math.round(v)+''},
+  {key:'QS',   label:'QS',     low:false, fmt:v=>Math.round(v)+''},
+  {key:'ERA',  label:'ERA',    low:true,  fmt:v=>(+v).toFixed(2)},
+  {key:'WHIP', label:'WHIP',   low:true,  fmt:v=>(+v).toFixed(2)},
+  {key:'SVH',  label:'SV+HLD', low:false, fmt:v=>Math.round(v)+''},
 ];
 
-function renderMatchupCards() {
-  const D = APP.data;
-  if (!D?.schedule?.length) return;
+function buildCatRow(c, aStats, hStats) {
+  const av = aStats[c.key] ?? aStats[c.key.toLowerCase()] ?? null;
+  const hv = hStats[c.key] ?? hStats[c.key.toLowerCase()] ?? null;
+  const an = parseFloat(av), hn = parseFloat(hv);
+  const valid = !isNaN(an) && !isNaN(hn);
+  const aWin = valid && (c.low ? an < hn : an > hn);
+  const hWin = valid && (c.low ? hn < an : hn > an);
+  const tot = valid ? an + hn : 1;
+  const aW = valid && tot > 0 ? Math.round(an/tot*100) : 50;
+  const hW = 100 - aW;
+  const aDisp = av != null ? c.fmt(an) : '—';
+  const hDisp = hv != null ? c.fmt(hn) : '—';
+  return `<div class="mc-cat-row">
+    <div class="val-a ${aWin?'win-val':hWin?'lose-val':valid?'tie-val':''}">${aDisp}</div>
+    <div class="bar-wrap"><div class="bar-fill" style="width:${aW}%;background:${aWin?'var(--green)':'rgba(255,255,255,.12)'}"></div></div>
+    <div class="cat-name">${c.label}</div>
+    <div class="bar-wrap" style="direction:rtl"><div class="bar-fill" style="width:${hW}%;background:${hWin?'var(--green)':'rgba(255,255,255,.12)'}"></div></div>
+    <div class="val-b ${hWin?'win-val':aWin?'lose-val':valid?'tie-val':''}">${hDisp}</div>
+  </div>`;
+}
 
-  const period = parseInt(document.getElementById('matchup-week')?.value) || 1;
-  const week = D.schedule.find(w => w.period === period);
+function renderCards(week, period, weekDates, catLookup) {
+  const D = APP.data;
   const grid = document.getElementById('matchup-grid');
   if (!grid) return;
-
+  const isCurrentWk = period === (D.schedule[D.schedule.length - 1]?.period);
   grid.innerHTML = '';
-  if (!week) { grid.innerHTML = emptyHtml(); return; }
-
-  const weekDates = getWeekDates(period);
 
   week.matchupList.forEach(m => {
     const awayTeam = D.rosters?.[m.away.id];
     const homeTeam = D.rosters?.[m.home.id];
-    const awayYou = m.away.id === YOU_ID;
-    const homeYou = m.home.id === YOU_ID;
+    const awayYou = m.away.id === YOU_ID, homeYou = m.home.id === YOU_ID;
     const you = awayYou || homeYou;
 
-    // Overall category win score
-    const awayScore = m.awayScore ?? m.awayPoints ?? m.away?.score ?? null;
-    const homeScore = m.homeScore ?? m.homePoints ?? m.home?.score ?? null;
-    const hasScore  = awayScore != null && homeScore != null;
-    const awayWin   = hasScore && awayScore > homeScore;
-    const homeWin   = hasScore && homeScore > awayScore;
+    const catEntry = catLookup[m.away.id + '_' + m.home.id] || catLookup[m.home.id + '_' + m.away.id];
+    const aScore = catEntry?.aScore ?? m.awayScore ?? null;
+    const hScore = catEntry?.hScore ?? m.homeScore ?? null;
+    const hasScore = aScore != null && hScore != null;
+    const aWin = hasScore && aScore > hScore, hWin = hasScore && hScore > aScore;
 
-    // Per-category stats if available
-    const cats = m.categories || m.cats || null;
-    let catHtml = '';
-    if (cats && typeof cats === 'object') {
-      const hitCats = CAT_DEFS.filter(c => c.hit);
-      const pitCats = CAT_DEFS.filter(c => !c.hit);
-      const buildRow = (catList) => catList.map(c => {
-        const av = cats[c.key]?.away ?? cats[c.key]?.a ?? null;
-        const hv = cats[c.key]?.home ?? cats[c.key]?.h ?? null;
-        if (av == null && hv == null) return '';
-        const aWin = av != null && hv != null && (c.lowerBetter ? av < hv : av > hv);
-        const hWin = av != null && hv != null && (c.lowerBetter ? hv < av : hv > av);
-        return `<div style="display:grid;grid-template-columns:1fr 48px 48px 48px 1fr;align-items:center;gap:2px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:11px">
-          <div style="text-align:right;font-weight:${aWin?700:400};color:${aWin?'var(--green)':'var(--text2)'}">${av ?? '—'}</div>
-          <div style="text-align:center;font-size:9px;color:${aWin?'var(--green)':'var(--text3)'}">●</div>
-          <div style="text-align:center;font-family:var(--cond);font-size:9px;color:var(--text3);letter-spacing:.5px">${c.label}</div>
-          <div style="text-align:center;font-size:9px;color:${hWin?'var(--green)':'var(--text3)'}">●</div>
-          <div style="text-align:left;font-weight:${hWin?700:400};color:${hWin?'var(--green)':'var(--text2)'}">${hv ?? '—'}</div>
-        </div>`;
-      }).join('');
-      catHtml = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-size:9px;color:var(--text3);font-family:var(--cond);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Batting</div>
-        ${buildRow(hitCats)}
-        <div style="font-size:9px;color:var(--text3);font-family:var(--cond);letter-spacing:1px;text-transform:uppercase;margin:8px 0 4px">Pitching</div>
-        ${buildRow(pitCats)}
-      </div>`;
-    }
+    const leadText = hasScore ? (aWin ? m.away.name+' LEADING' : hWin ? m.home.name+' LEADING' : 'TIED') : 'WK '+period;
 
-    // Win probability
+    const aStats = catEntry?.away || {};
+    const hStats = catEntry?.home || {};
+    const hasCats = Object.keys(aStats).length > 0;
+
+    const scoreBlock = hasScore
+      ? `<div class="mc-score-block">
+           <div class="mc-score">
+             <span style="color:${aWin?'var(--green)':hWin?'var(--red)':'var(--accent)'}">${aScore}</span>
+             <span class="mc-score-sep">-</span>
+             <span style="color:${hWin?'var(--green)':aWin?'var(--red)':'var(--accent)'}">${hScore}</span>
+           </div>
+           <div class="mc-status">${isCurrentWk?'● LIVE':'FINAL'}</div>
+         </div>`
+      : `<div class="mc-score-block"><div class="mc-vs">VS</div></div>`;
+
     let probHtml = '';
-    if (awayTeam && homeTeam && !hasScore) {
+    if (!hasScore && awayTeam && homeTeam) {
       const wp = calcWinProbability(awayTeam, homeTeam, weekDates);
-      const awayProb = wp.probA;
-      const homeProb = wp.probB;
-      probHtml = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${awayProb>homeProb?'var(--green)':'var(--text3)'};min-width:34px">${awayProb}%</span>
-          <div style="flex:1;height:6px;background:var(--card2);border-radius:3px;overflow:hidden">
-            <div style="width:${awayProb}%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:3px"></div>
-          </div>
-          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${homeProb>awayProb?'var(--green)':'var(--text3)'};min-width:34px;text-align:right">${homeProb}%</span>
-        </div>
-        <div style="font-size:10px;color:var(--text3);text-align:center">Win probability</div>
+      probHtml = `<div class="mc-prob">
+        <span class="mc-prob-pct" style="color:${wp.probA>wp.probB?'var(--green)':'var(--text3)'}">${wp.probA}%</span>
+        <div class="mc-prob-bar"><div class="mc-prob-fill" style="width:${wp.probA}%"></div></div>
+        <span class="mc-prob-pct" style="text-align:right;color:${wp.probB>wp.probA?'var(--green)':'var(--text3)'}">${wp.probB}%</span>
       </div>`;
     }
+
+    const catsHtml = hasCats ? `<div class="mc-cats">
+      <div class="mc-cats-label">Batting</div>
+      ${HIT_CATS.map(c => buildCatRow(c, aStats, hStats)).join('')}
+      <div class="mc-cats-label">Pitching</div>
+      ${PIT_CATS.map(c => buildCatRow(c, aStats, hStats)).join('')}
+    </div>` : '';
 
     grid.innerHTML += `<div class="matchup-card${you?' is-you':''}">
-      <div class="matchup-teams">
-        <div class="mt-away">
-          <div class="mt-name">${m.away.name}${awayYou?' ★':''}</div>
-          <div class="mt-owner">${m.away.shortName}</div>
+      <div class="mc-header"><span>WEEK ${period}</span><span class="mc-leading">${leadText}</span></div>
+      <div class="mc-teams">
+        <div class="mc-team-away">
+          <div class="mc-team-name">${m.away.name}${awayYou?' ★':''}</div>
+          <div class="mc-team-owner">${m.away.shortName}</div>
         </div>
-        <div>
-          ${hasScore
-            ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <span style="font-family:var(--display);font-size:28px;line-height:1;color:${awayWin?'var(--green)':'var(--text3)'}">${awayScore}</span>
-                  <span style="font-size:10px;color:var(--text3)">-</span>
-                  <span style="font-family:var(--display);font-size:28px;line-height:1;color:${homeWin?'var(--green)':'var(--text3)'}">${homeScore}</span>
-                </div>
-                <div style="font-size:9px;color:var(--text3);font-family:var(--cond);letter-spacing:.5px">${period === (D.schedule[D.schedule.length-1]?.period) ? 'LIVE' : 'FINAL'}</div>
-              </div>`
-            : `<div class="mt-vs">VS</div><div class="mt-week">WK ${period}</div>`
-          }
-        </div>
-        <div class="mt-home">
-          <div class="mt-name">${m.home.name}${homeYou?' ★':''}</div>
-          <div class="mt-owner">${m.home.shortName}</div>
+        ${scoreBlock}
+        <div class="mc-team-home">
+          <div class="mc-team-name">${m.home.name}${homeYou?' ★':''}</div>
+          <div class="mc-team-owner">${m.home.shortName}</div>
         </div>
       </div>
-      ${catHtml}
-      ${probHtml}
+      ${probHtml}${catsHtml}
     </div>`;
   });
+}
 
+function renderMatchupCards() {
+  const D = APP.data;
+  if (!D?.schedule?.length) return;
+  const period = parseInt(document.getElementById('matchup-week')?.value) || 1;
+  const week = D.schedule.find(w => w.period === period);
+  const grid = document.getElementById('matchup-grid');
+  if (!grid) return;
+  if (!week) { grid.innerHTML = emptyHtml(); return; }
+  const weekDates = getWeekDates(period);
+
+  // Render immediately with what we have
+  renderCards(week, period, weekDates, {});
+
+  // Fetch live category data and upgrade
+  fetchLiveCategoryData(period).then(apiData => {
+    if (apiData) renderCards(week, period, weekDates, parseCatLookup(apiData));
+  });
+
+  fetchProbablePitchers().then(() => { winProbCache = {}; renderCards(week, period, weekDates, parseCatLookup(liveScoreCache[period])); });
   renderMatchupPreview(week, period, weekDates);
 }
 
