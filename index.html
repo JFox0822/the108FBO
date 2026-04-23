@@ -1380,14 +1380,19 @@ window.APP = {
 };
 
 // ── INIT ────────────────────────────────────────
-async function initApp() {
+async function initApp(isRefresh = false) {
   try {
-    const [dataRes, histRes] = await Promise.all([
-      fetch('data.json?t=' + Date.now()),
-      fetch('history.json?t=' + Date.now())
-    ]);
+    // data.json is required; history.json is optional (graceful fallback)
+    const dataRes = await fetch('data.json?t=' + Date.now());
+    if (!dataRes.ok) throw new Error(`data.json returned ${dataRes.status}`);
     APP.data = await dataRes.json();
-    APP.history = await histRes.json();
+
+    // history.json — load if available, skip silently if not
+    try {
+      const histRes = await fetch('history.json?t=' + Date.now());
+      if (histRes.ok) APP.history = await histRes.json();
+    } catch(e) { /* history.json missing — historical tabs will show empty state */ }
+
     APP.loaded = true;
 
     // Build color map from roster order
@@ -1397,7 +1402,7 @@ async function initApp() {
       }
     });
 
-    // Update nav
+    // Update nav timestamp
     const rawUpdated = APP.data.meta?.updatedDate;
     let updatedDisplay = 'Unknown';
     if (rawUpdated) {
@@ -1408,20 +1413,34 @@ async function initApp() {
           month: 'short', day: 'numeric',
           hour: 'numeric', minute: '2-digit',
           hour12: true
-        }) + ' EST';
+        }) + ' ET';
       } catch(e) { updatedDisplay = rawUpdated; }
     }
     document.getElementById('updated-text').textContent = updatedDisplay;
 
-    // Render active page
+    // Re-render active page (on refresh, silently re-render in background)
     const activePage = document.querySelector('.page.active')?.id?.replace('page-', '');
     if (activePage) renderPage(activePage);
 
   } catch (e) {
     console.error('Failed to load data:', e);
-    document.getElementById('updated-text').textContent = 'Load failed';
+    if (!isRefresh) {
+      document.getElementById('updated-text').textContent = 'No data yet';
+      // Show a friendly message in the standings table if it's the first load
+      const tb = document.getElementById('standings-tbody');
+      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text3);font-size:13px">
+        ⏳ Waiting for first data refresh — check back shortly, or trigger a manual run in GitHub Actions.
+      </td></tr>`;
+    }
   }
 }
+
+// ── AUTO-REFRESH every 15 minutes ───────────────
+setInterval(() => {
+  console.log('[108FBO] Auto-refreshing data...');
+  initApp(true);
+}, 15 * 60 * 1000);
+
 
 // ── PAGE → GROUP MAP ────────────────────────────
 const PAGE_GROUP = {
