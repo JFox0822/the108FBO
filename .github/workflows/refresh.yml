@@ -1,9 +1,9 @@
-name: Daily Fantrax Refresh
+name: Fantrax Refresh (15-min)
 
 on:
   schedule:
-    - cron: '0 13 * * *'  # 8am CST (UTC-5) = 1pm UTC
-  workflow_dispatch:        # also lets you trigger manually from GitHub
+    - cron: '*/15 * * * *'   # every 15 minutes
+  workflow_dispatch:           # manual trigger from GitHub UI
 
 jobs:
   refresh:
@@ -32,5 +32,5 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add data.json
-          git diff --staged --quiet || git commit -m "Daily data refresh $(date +'%Y-%m-%d')"
+          git diff --staged --quiet || git commit -m "Auto refresh $(date -u +'%Y-%m-%d %H:%M UTC')"
           git push
