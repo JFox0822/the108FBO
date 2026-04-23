@@ -1,8 +1,6 @@
-import requests, json, os, sys
+import requests, json, os
 from datetime import datetime
 
-EMAIL    = os.environ.get('FANTRAX_EMAIL',    'jacob.g.fox5@gmail.com')
-PASSWORD = os.environ.get('FANTRAX_PASSWORD', '..Rubygirl01')
 LID  = 'ai1iqnl9mg6kvw0f'
 BASE = 'https://www.fantrax.com'
 
@@ -22,41 +20,20 @@ TEAMS = {
 }
 
 s = requests.Session()
-s.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Accept': 'application/json, text/plain, */*',
-    'Origin': 'https://www.fantrax.com',
-    'Referer': 'https://www.fantrax.com/',
-})
+s.headers.update({'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'})
 
-# ── LOGIN ─────────────────────────────────────────
-print('Logging in to Fantrax...')
-try:
-    s.get(f'{BASE}/login', timeout=15)
-    login_r = s.post(
-        f'{BASE}/login',
-        data={'email': EMAIL, 'password': PASSWORD, 'next': '/'},
-        allow_redirects=True, timeout=30
-    )
-    print(f'  Login status: {login_r.status_code}, URL: {login_r.url}')
-    if '/login' in login_r.url and 'error' in login_r.text.lower():
-        print('  Login failed'); sys.exit(1)
-    print('  Login complete')
-except Exception as e:
-    print(f'  Login exception: {e}'); sys.exit(1)
-
-def get(path, params=None, label=''):
+def get(path, params=None):
     if params is None: params = {}
     params['leagueId'] = LID
     try:
         r = s.get(BASE + path, params=params, timeout=30)
         if r.status_code == 200:
             try: return r.json()
-            except: return {}
-        print(f'  {label or path}: HTTP {r.status_code}')
+            except: pass
+        print(f'  ⚠️  {path}: HTTP {r.status_code}')
         return {}
     except Exception as e:
-        print(f'  {label or path}: {e}'); return {}
+        print(f'  ⚠️  {path}: {e}'); return {}
 
 # ── PLAYER ADP ────────────────────────────────────
 print('Fetching player ADP...')
@@ -77,10 +54,10 @@ print(f'  {len(player_map)} players loaded')
 
 # ── ROSTERS ───────────────────────────────────────
 print('Fetching rosters...')
-rosters_raw = get('/fxea/general/getTeamRosters', label='rosters')
+rosters_raw = get('/fxea/general/getTeamRosters')
 rosters = {}
 roster_data = rosters_raw.get('rosters', rosters_raw.get('teamRosters', {}))
-print(f'  Got roster data for {len(roster_data)} teams')
+print(f'  {len(roster_data)} teams')
 
 for team_id, team_data in roster_data.items():
     meta = TEAMS.get(team_id, {})
@@ -106,15 +83,14 @@ for tid, meta in TEAMS.items():
         rosters[tid] = {'id': tid, 'name': meta['name'], 'owner': meta['owner'], 'players': []}
 
 # ── SCHEDULE & SCORES ─────────────────────────────
-# getLeagueInfo contains a 'matchups' key with ALL matchup/score data
 print('Fetching schedule & scores...')
 schedule = []
-league_info = get('/fxea/general/getLeagueInfo', label='leagueInfo')
+league_info = get('/fxea/general/getLeagueInfo')
 raw_matchups = league_info.get('matchups', [])
-print(f'  Raw matchups from leagueInfo: {len(raw_matchups)}')
+print(f'  {len(raw_matchups)} matchups from leagueInfo')
 
 if raw_matchups:
-    print(f'  Sample matchup: {raw_matchups[0]}')
+    print(f'  Sample: {raw_matchups[0]}')
     period_map = {}
     for m in raw_matchups:
         if not isinstance(m, dict): continue
@@ -138,17 +114,17 @@ if raw_matchups:
             home_score = home_score or m['home'].get('score') or m['home'].get('catWins')
 
         period_map[period].append({
-            'away': {'id': away_id, 'name': TEAMS.get(away_id,{}).get('name', away_id),
-                     'shortName': TEAMS.get(away_id,{}).get('owner','?')},
-            'home': {'id': home_id, 'name': TEAMS.get(home_id,{}).get('name', home_id),
-                     'shortName': TEAMS.get(home_id,{}).get('owner','?')},
+            'away': {'id': away_id, 'name': TEAMS.get(away_id, {}).get('name', away_id),
+                     'shortName': TEAMS.get(away_id, {}).get('owner', '?')},
+            'home': {'id': home_id, 'name': TEAMS.get(home_id, {}).get('name', home_id),
+                     'shortName': TEAMS.get(home_id, {}).get('owner', '?')},
             'awayScore': away_score, 'homeScore': home_score,
         })
 
     for period in sorted(period_map.keys()):
         schedule.append({'period': period, 'matchupList': period_map[period]})
 
-# Fallback to scoreboard if leagueInfo had no matchups
+# Fallback: scoreboard per period
 if not schedule:
     print('  Trying scoreboard fallback...')
     empty = 0
@@ -158,7 +134,7 @@ if not schedule:
             ('/fxea/general/getScoreboard', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
             ('/fxea/general/getScoreboard', {'period': period}),
         ]:
-            raw = get(ep, params, label=f'sb-{period}')
+            raw = get(ep, params)
             rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
             if not rows: continue
             pm = []
@@ -167,8 +143,10 @@ if not schedule:
                 aid, hid = row.get('awayTeamId',''), row.get('homeTeamId','')
                 if not aid or not hid: continue
                 pm.append({
-                    'away': {'id': aid, 'name': TEAMS.get(aid,{}).get('name',aid), 'shortName': TEAMS.get(aid,{}).get('owner','?')},
-                    'home': {'id': hid, 'name': TEAMS.get(hid,{}).get('name',hid), 'shortName': TEAMS.get(hid,{}).get('owner','?')},
+                    'away': {'id': aid, 'name': TEAMS.get(aid,{}).get('name',aid),
+                             'shortName': TEAMS.get(aid,{}).get('owner','?')},
+                    'home': {'id': hid, 'name': TEAMS.get(hid,{}).get('name',hid),
+                             'shortName': TEAMS.get(hid,{}).get('owner','?')},
                     'awayScore': row.get('awayScore'), 'homeScore': row.get('homeScore'),
                 })
             if pm:
@@ -178,20 +156,20 @@ if not schedule:
             empty += 1
             if empty >= 3 and period > 3: break
 
-print(f'  Schedule: {len(schedule)} weeks')
+print(f'  {len(schedule)} weeks in schedule')
 
 # ── STANDINGS ─────────────────────────────────────
 print('Fetching standings...')
-standings = []
 rows = []
-for ep, params in [('/fxea/general/getStandings', {'season': 2026}), ('/fxea/general/getStandings', {})]:
-    raw = get(ep, params, label='standings')
+for params in [{'season': 2026}, {}]:
+    raw = get('/fxea/general/getStandings', params)
     rows = raw if isinstance(raw, list) else raw.get('standings', raw.get('teams', []))
     if isinstance(rows, dict): rows = list(rows.values())
     if rows:
         print(f'  {len(rows)} rows · keys: {list(rows[0].keys())[:8]}')
         break
 
+standings = []
 for row in rows:
     if not isinstance(row, dict): continue
     w = l = t = 0
@@ -206,20 +184,20 @@ for row in rows:
         t = int(row.get('ties', 0) or 0)
     total = w + l + t
     standings.append({
-        'teamId': row.get('teamId', ''), 'teamName': row.get('teamName', ''),
+        'teamId': row.get('teamId',''), 'teamName': row.get('teamName',''),
         'points': f'{w}-{l}-{t}', 'wins': w, 'losses': l, 'ties': t,
-        'winPercentage': round(w / total, 4) if total else 0.0,
-        'gamesBack': row.get('gamesBack', 0), 'streak': row.get('streak', ''),
+        'winPercentage': round(w/total, 4) if total else 0.0,
+        'gamesBack': row.get('gamesBack', 0), 'streak': row.get('streak',''),
         'rank': row.get('rank', 0),
     })
 standings.sort(key=lambda r: (-r['wins'], r['losses']))
-print(f'  {len(standings)} teams in standings')
+print(f'  {len(standings)} teams')
 
 # ── PAST SEASONS ──────────────────────────────────
 print('Fetching past seasons...')
 past = {}
 for season in ['2022', '2023', '2024', '2025']:
-    raw = get('/fxea/general/getStandings', {'season': season}, label=f'standings-{season}')
+    raw = get('/fxea/general/getStandings', {'season': season})
     rows2 = raw if isinstance(raw, list) else raw.get('standings', [])
     if isinstance(rows2, dict): rows2 = list(rows2.values())
     past[season] = rows2
@@ -243,4 +221,4 @@ with open(out_path, 'w') as f:
 
 print(f'\n✅  Done! → {out_path}')
 print(f'👥  {len(rosters)} rosters · {named}/{len(player_map_out)} players named')
-print(f'📅  {len(schedule)} weeks · 📊 {len(standings)} teams in standings')
+print(f'📅  {len(schedule)} weeks · 📊 {len(standings)} teams')
