@@ -2067,11 +2067,10 @@ async function renderMatchups() {
 
   if (!D.schedule?.length) {
     const grid = document.getElementById('matchup-grid');
-    if (grid) grid.innerHTML = '<div style="color:var(--text3);padding:40px;text-align:center;font-size:13px">Schedule not yet loaded. Check back after the season starts.</div>';
+    if (grid) grid.innerHTML = '<div style="color:var(--text3);padding:40px;text-align:center;font-size:13px">Schedule not yet loaded.</div>';
     return;
   }
 
-  // Populate week selector
   const sel = document.getElementById('matchup-week');
   if (sel && !sel.children.length) {
     D.schedule.forEach(w => {
@@ -2080,19 +2079,34 @@ async function renderMatchups() {
       o.textContent = 'Week ' + w.period;
       sel.appendChild(o);
     });
-    // Auto-select the most recent week in the schedule (avoids date-math breaking on extended weeks)
-    const lastPeriod = D.schedule[D.schedule.length - 1]?.period || 1;
-    if (sel) sel.value = lastPeriod;
+    // Default to most recent week that has scores; fallback to last week
+    const lastScored = [...D.schedule].reverse().find(w =>
+      w.matchupList?.some(m => m.awayScore != null || m.homeScore != null)
+    );
+    sel.value = lastScored?.period || D.schedule[D.schedule.length - 1]?.period || 1;
   }
 
-  // Load probable pitchers in background
-  fetchProbablePitchers().then(() => {
-    winProbCache = {};
-    renderMatchupCards();
-  });
-
+  fetchProbablePitchers().then(() => { winProbCache = {}; renderMatchupCards(); });
   renderMatchupCards();
 }
+
+// Scoring categories for The 108 FBO
+const CAT_DEFS = [
+  {key:'R',    label:'R',      hit:true,  lowerBetter:false},
+  {key:'HR',   label:'HR',     hit:true,  lowerBetter:false},
+  {key:'RBI',  label:'RBI',    hit:true,  lowerBetter:false},
+  {key:'K_bat',label:'K',      hit:true,  lowerBetter:true },
+  {key:'SB',   label:'SB',     hit:true,  lowerBetter:false},
+  {key:'AVG',  label:'AVG',    hit:true,  lowerBetter:false},
+  {key:'OPS',  label:'OPS',    hit:true,  lowerBetter:false},
+  {key:'IP',   label:'IP',     hit:false, lowerBetter:false},
+  {key:'H_pit',label:'H',      hit:false, lowerBetter:true },
+  {key:'K_pit',label:'K',      hit:false, lowerBetter:false},
+  {key:'QS',   label:'QS',     hit:false, lowerBetter:false},
+  {key:'ERA',  label:'ERA',    hit:false, lowerBetter:true },
+  {key:'WHIP', label:'WHIP',   hit:false, lowerBetter:true },
+  {key:'SVH',  label:'SV+HLD', hit:false, lowerBetter:false},
+];
 
 function renderMatchupCards() {
   const D = APP.data;
@@ -2115,74 +2129,86 @@ function renderMatchupCards() {
     const homeYou = m.home.id === YOU_ID;
     const you = awayYou || homeYou;
 
+    // Overall category win score
+    const awayScore = m.awayScore ?? m.awayPoints ?? m.away?.score ?? null;
+    const homeScore = m.homeScore ?? m.homePoints ?? m.home?.score ?? null;
+    const hasScore  = awayScore != null && homeScore != null;
+    const awayWin   = hasScore && awayScore > homeScore;
+    const homeWin   = hasScore && homeScore > awayScore;
+
+    // Per-category stats if available
+    const cats = m.categories || m.cats || null;
+    let catHtml = '';
+    if (cats && typeof cats === 'object') {
+      const hitCats = CAT_DEFS.filter(c => c.hit);
+      const pitCats = CAT_DEFS.filter(c => !c.hit);
+      const buildRow = (catList) => catList.map(c => {
+        const av = cats[c.key]?.away ?? cats[c.key]?.a ?? null;
+        const hv = cats[c.key]?.home ?? cats[c.key]?.h ?? null;
+        if (av == null && hv == null) return '';
+        const aWin = av != null && hv != null && (c.lowerBetter ? av < hv : av > hv);
+        const hWin = av != null && hv != null && (c.lowerBetter ? hv < av : hv > av);
+        return `<div style="display:grid;grid-template-columns:1fr 48px 48px 48px 1fr;align-items:center;gap:2px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:11px">
+          <div style="text-align:right;font-weight:${aWin?700:400};color:${aWin?'var(--green)':'var(--text2)'}">${av ?? '—'}</div>
+          <div style="text-align:center;font-size:9px;color:${aWin?'var(--green)':'var(--text3)'}">●</div>
+          <div style="text-align:center;font-family:var(--cond);font-size:9px;color:var(--text3);letter-spacing:.5px">${c.label}</div>
+          <div style="text-align:center;font-size:9px;color:${hWin?'var(--green)':'var(--text3)'}">●</div>
+          <div style="text-align:left;font-weight:${hWin?700:400};color:${hWin?'var(--green)':'var(--text2)'}">${hv ?? '—'}</div>
+        </div>`;
+      }).join('');
+      catHtml = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--cond);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Batting</div>
+        ${buildRow(hitCats)}
+        <div style="font-size:9px;color:var(--text3);font-family:var(--cond);letter-spacing:1px;text-transform:uppercase;margin:8px 0 4px">Pitching</div>
+        ${buildRow(pitCats)}
+      </div>`;
+    }
+
     // Win probability
     let probHtml = '';
-    if (awayTeam && homeTeam) {
+    if (awayTeam && homeTeam && !hasScore) {
       const wp = calcWinProbability(awayTeam, homeTeam, weekDates);
       const awayProb = wp.probA;
       const homeProb = wp.probB;
-      const awayColor = awayProb > homeProb ? 'var(--green)' : 'var(--text3)';
-      const homeColor = homeProb > awayProb ? 'var(--green)' : 'var(--text3)';
-
-      // Today's probable starters
-      const today = new Date().toISOString().split('T')[0];
-      const todayProbA = wp.probAblesA?.filter(p => p.date === today) || [];
-      const todayProbB = wp.probAblesB?.filter(p => p.date === today) || [];
-      const allWeekProbA = wp.probAblesA || [];
-      const allWeekProbB = wp.probAblesB || [];
-
-      probHtml = '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">' +
-        // Probability bar
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
-        '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:' + awayColor + ';min-width:36px">' + awayProb + '%</span>' +
-        '<div style="flex:1;height:8px;background:var(--card2);border-radius:4px;overflow:hidden">' +
-        '<div style="width:' + awayProb + '%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:4px;transition:width .5s"></div></div>' +
-        '<span style="font-family:var(--mono);font-size:12px;font-weight:700;color:' + homeColor + ';min-width:36px;text-align:right">' + homeProb + '%</span>' +
-        '</div>' +
-        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:2px">' +
-        '<span>Win probability</span>' +
-        '<span style="color:' + (probablesLoaded&&allWeekProbA.length+allWeekProbB.length>0?'var(--green)':'var(--text3)') + '">' +
-        (probablesLoaded && allWeekProbA.length + allWeekProbB.length > 0 ? '⚡ Updated with pitching schedule' : '📊 Roster-based estimate') + '</span>' +
-        '</div>' +
-        // Today's starters if available
-        (todayProbA.length + todayProbB.length > 0 ?
-          '<div style="margin-top:6px;font-size:11px;color:var(--text3)">' +
-          '⚾ Today\'s starters: ' +
-          [...todayProbA.map(p => '<span style="color:var(--green)">' + p.name + '</span>'),
-           ...todayProbB.map(p => '<span style="color:var(--blue)">' + p.name + '</span>')].join(', ') +
-          '</div>' : '') +
-        // Week's scheduled starters
-        (allWeekProbA.length + allWeekProbB.length > 0 ?
-          '<div style="margin-top:4px;font-size:10px;color:var(--text3)">' +
-          'Week starts — ' + m.away.name.split(' ').pop() + ': ' +
-          (allWeekProbA.length ? allWeekProbA.map(p=>'<span style="color:var(--green)">'+p.name.split(' ').pop()+'</span> <span style="opacity:.5">('+p.date.slice(5)+')</span>').join(', ') : 'None scheduled') +
-          ' · ' + m.home.name.split(' ').pop() + ': ' +
-          (allWeekProbB.length ? allWeekProbB.map(p=>'<span style="color:var(--blue)">'+p.name.split(' ').pop()+'</span> <span style="opacity:.5">('+p.date.slice(5)+')</span>').join(', ') : 'None scheduled') +
-          '</div>' : '') +
-        '</div>';
+      probHtml = `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${awayProb>homeProb?'var(--green)':'var(--text3)'};min-width:34px">${awayProb}%</span>
+          <div style="flex:1;height:6px;background:var(--card2);border-radius:3px;overflow:hidden">
+            <div style="width:${awayProb}%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:3px"></div>
+          </div>
+          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:${homeProb>awayProb?'var(--green)':'var(--text3)'};min-width:34px;text-align:right">${homeProb}%</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);text-align:center">Win probability</div>
+      </div>`;
     }
 
-    // Show final score if available — handle multiple possible field names from Fantrax API
-    const awayScoreVal = m.awayScore ?? m.awayPoints ?? m.awayWins ?? m.away?.score ?? m.away?.points ?? m.away?.wins ?? null;
-    const homeScoreVal = m.homeScore ?? m.homePoints ?? m.homeWins ?? m.home?.score ?? m.home?.points ?? m.home?.wins ?? null;
-    const hasScore = awayScoreVal != null && homeScoreVal != null;
-    const scoreHtml = hasScore
-      ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">' +
-        '<span style="font-family:var(--display);font-size:24px;color:' + (awayScoreVal > homeScoreVal ? 'var(--green)' : awayScoreVal < homeScoreVal ? 'var(--text3)' : 'var(--accent)') + '">' + awayScoreVal + '</span>' +
-        '<span style="font-size:11px;color:var(--text3)">FINAL</span>' +
-        '<span style="font-family:var(--display);font-size:24px;color:' + (homeScoreVal > awayScoreVal ? 'var(--green)' : homeScoreVal < awayScoreVal ? 'var(--text3)' : 'var(--accent)') + '">' + homeScoreVal + '</span>' +
-        '</div>'
-      : '';
-
-    grid.innerHTML += '<div class="matchup-card' + (you?' is-you':'') + '">' +
-      '<div class="matchup-teams">' +
-      '<div class="mt-away"><div class="mt-name">' + m.away.name + (awayYou?' ★':'') + '</div><div class="mt-owner">' + m.away.shortName + '</div></div>' +
-      '<div><div class="mt-vs">VS</div><div class="mt-week">WK ' + period + '</div></div>' +
-      '<div class="mt-home"><div class="mt-name">' + m.home.name + (homeYou?' ★':'') + '</div><div class="mt-owner">' + m.home.shortName + '</div></div>' +
-      '</div>' +
-      scoreHtml +
-      probHtml +
-      '</div>';
+    grid.innerHTML += `<div class="matchup-card${you?' is-you':''}">
+      <div class="matchup-teams">
+        <div class="mt-away">
+          <div class="mt-name">${m.away.name}${awayYou?' ★':''}</div>
+          <div class="mt-owner">${m.away.shortName}</div>
+        </div>
+        <div>
+          ${hasScore
+            ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-family:var(--display);font-size:28px;line-height:1;color:${awayWin?'var(--green)':'var(--text3)'}">${awayScore}</span>
+                  <span style="font-size:10px;color:var(--text3)">-</span>
+                  <span style="font-family:var(--display);font-size:28px;line-height:1;color:${homeWin?'var(--green)':'var(--text3)'}">${homeScore}</span>
+                </div>
+                <div style="font-size:9px;color:var(--text3);font-family:var(--cond);letter-spacing:.5px">${period === (D.schedule[D.schedule.length-1]?.period) ? 'LIVE' : 'FINAL'}</div>
+              </div>`
+            : `<div class="mt-vs">VS</div><div class="mt-week">WK ${period}</div>`
+          }
+        </div>
+        <div class="mt-home">
+          <div class="mt-name">${m.home.name}${homeYou?' ★':''}</div>
+          <div class="mt-owner">${m.home.shortName}</div>
+        </div>
+      </div>
+      ${catHtml}
+      ${probHtml}
+    </div>`;
   });
 
   renderMatchupPreview(week, period, weekDates);
