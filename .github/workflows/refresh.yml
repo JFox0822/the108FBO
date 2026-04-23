@@ -2,33 +2,20 @@ name: Fantrax Refresh (15-min)
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 minutes
-  workflow_dispatch:           # manual trigger from GitHub UI
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Run fetch script
-        env:
-          FANTRAX_EMAIL: ${{ secrets.FANTRAX_EMAIL }}
-          FANTRAX_PASSWORD: ${{ secrets.FANTRAX_PASSWORD }}
-        run: python scripts/fetch_data.py
-
-      - name: Commit and push data.json
-        run: |
+      - run: pip install requests
+      - run: python scripts/fetch_data.py
+      - run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add data.json
