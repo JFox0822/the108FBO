@@ -91,39 +91,36 @@ print(f'  {len(raw_matchups)} matchups from leagueInfo')
 
 if raw_matchups:
     print(f'  Full sample matchup: {json.dumps(raw_matchups[0])}')
-    print(f'  leagueInfo teamInfo keys: {list(league_info.get("teamInfo", {}).keys())[:5]}')
-    period_map = {}
-    for m in raw_matchups:
-        if not isinstance(m, dict): continue
-        period = m.get('period', m.get('scoringPeriod', m.get('week', 0)))
-        if period not in period_map: period_map[period] = []
 
-        away_id = m.get('awayTeamId', (m.get('away') or {}).get('id', ''))
-        home_id = m.get('homeTeamId', (m.get('home') or {}).get('id', ''))
+    # Each item is a period object: {"period": N, "matchupList": [...]}
+    for period_obj in raw_matchups:
+        if not isinstance(period_obj, dict): continue
+        period = period_obj.get('period', 0)
+        matchups_in_period = period_obj.get('matchupList', [])
+        period_matchups = []
 
-        def _s(row, keys):
-            for k in keys:
-                v = row.get(k)
-                if v is not None: return v
-            return None
+        for m in matchups_in_period:
+            if not isinstance(m, dict): continue
+            away = m.get('away', {})
+            home  = m.get('home', {})
+            away_id = away.get('id', '')
+            home_id  = home.get('id', '')
+            if not away_id or not home_id: continue
+            away_meta = TEAMS.get(away_id, {})
+            home_meta  = TEAMS.get(home_id, {})
+            period_matchups.append({
+                'away': {'id': away_id,
+                         'name': away_meta.get('name', away.get('name', away_id)),
+                         'shortName': away_meta.get('owner', away.get('shortName', '?'))},
+                'home': {'id': home_id,
+                         'name': home_meta.get('name', home.get('name', home_id)),
+                         'shortName': home_meta.get('owner', home.get('shortName', '?'))},
+                'awayScore': away.get('score') or away.get('catWins') or m.get('awayScore'),
+                'homeScore': home.get('score') or home.get('catWins') or m.get('homeScore'),
+            })
 
-        away_score = _s(m, ['awayScore','awayPoints','awayCatWins','team1Score'])
-        home_score = _s(m, ['homeScore','homePoints','homeCatWins','team2Score'])
-        if isinstance(m.get('away'), dict):
-            away_score = away_score or m['away'].get('score') or m['away'].get('catWins')
-        if isinstance(m.get('home'), dict):
-            home_score = home_score or m['home'].get('score') or m['home'].get('catWins')
-
-        period_map[period].append({
-            'away': {'id': away_id, 'name': TEAMS.get(away_id, {}).get('name', away_id),
-                     'shortName': TEAMS.get(away_id, {}).get('owner', '?')},
-            'home': {'id': home_id, 'name': TEAMS.get(home_id, {}).get('name', home_id),
-                     'shortName': TEAMS.get(home_id, {}).get('owner', '?')},
-            'awayScore': away_score, 'homeScore': home_score,
-        })
-
-    for period in sorted(period_map.keys()):
-        schedule.append({'period': period, 'matchupList': period_map[period]})
+        if period_matchups:
+            schedule.append({'period': period, 'matchupList': period_matchups})
 
 # Fallback: scoreboard per period
 if not schedule:
