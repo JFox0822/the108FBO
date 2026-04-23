@@ -102,68 +102,77 @@ body::before {
   display: none;
 }
 @media (min-width: 380px) { .nav-title { display: block; } }
-/* ── GROUPED NAV ── */
+/* ── GROUPED NAV (two-row) ── */
+#app-nav {
+  position: sticky; top: 0; z-index: 300;
+  background: rgba(6,8,15,.96);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Row 1: brand + group tabs + timestamp */
+.nav-inner {
+  max-width: 1240px; margin: 0 auto;
+  padding: 0 16px;
+  display: flex; align-items: center; gap: 12px;
+  height: 52px; border-bottom: 1px solid rgba(255,255,255,.04);
+}
+
 .nav-groups {
-  flex: 1; display: none; gap: 2px; align-items: center; padding: 6px 0;
+  flex: 1; display: none; gap: 2px; align-items: center;
 }
 @media (min-width: 740px) { .nav-groups { display: flex; } }
 
-.nav-group { position: relative; }
-
 .nav-group-btn {
-  padding: 8px 14px; border-radius: 8px;
+  padding: 6px 14px; border-radius: 7px;
   border: 1px solid transparent; background: transparent;
   color: var(--text3); font-size: 13px; font-weight: 500;
-  transition: all .15s; cursor: pointer; min-height: 36px;
-  display: flex; align-items: center; gap: 6px;
+  transition: all .15s; cursor: pointer;
+  display: flex; align-items: center;
   white-space: nowrap; font-family: var(--font);
 }
-.nav-group-btn:hover { color: var(--text); background: rgba(255,255,255,.05); border-color: var(--border); }
+.nav-group-btn:hover { color: var(--text); background: rgba(255,255,255,.05); }
 .nav-group-btn.active {
-  background: var(--green-dim); color: var(--green);
-  border: 1px solid rgba(0,230,118,.3); font-weight: 600;
+  color: var(--green); font-weight: 600;
+  background: var(--green-dim);
+  border-color: rgba(0,230,118,.25);
 }
-.nav-group-btn .g-caret {
-  font-size: 7px; opacity: .5; transition: transform .15s;
-}
-.nav-group:hover .nav-group-btn .g-caret { transform: rotate(180deg); opacity: .8; }
 
-/* Dropdown panel */
-.nav-dropdown {
-  position: absolute; top: calc(100% + 4px); left: 0;
-  min-width: 190px;
-  background: var(--card2);
-  border: 1px solid var(--border2); border-radius: 10px;
-  padding: 5px; box-shadow: 0 8px 40px rgba(0,0,0,.6);
-  opacity: 0; pointer-events: none;
-  transform: translateY(-6px);
-  transition: opacity .15s, transform .15s;
-  z-index: 400;
-  display: flex; flex-direction: column; gap: 1px;
+/* Row 2: flat sub-page buttons */
+.nav-subbar {
+  display: none; max-width: 1240px; margin: 0 auto;
+  padding: 0 16px; height: 42px;
+  align-items: center; gap: 2px;
+  overflow-x: auto; scrollbar-width: none;
 }
-.nav-group:hover .nav-dropdown {
-  opacity: 1; pointer-events: all; transform: translateY(0);
-}
+.nav-subbar::-webkit-scrollbar { display: none; }
+@media (min-width: 740px) { .nav-subbar { display: flex; } }
+
+.nav-sub { display: none; gap: 2px; align-items: center; flex-shrink: 0; }
+.nav-sub.active { display: flex; }
 
 .nav-drop-item {
-  padding: 8px 12px; border-radius: 7px;
-  font-size: 13px; color: var(--text2);
-  cursor: pointer; transition: all .12s;
-  border: none; background: transparent;
-  text-align: left; white-space: nowrap;
-  display: flex; align-items: center; gap: 9px;
-  font-family: var(--font); width: 100%;
+  padding: 5px 12px; border-radius: 6px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--text3); font-size: 12px; font-weight: 500;
+  transition: all .12s; cursor: pointer;
+  white-space: nowrap; font-family: var(--font);
+  display: flex; align-items: center; gap: 6px;
 }
-.nav-drop-item:hover { background: rgba(255,255,255,.06); color: var(--text); }
-.nav-drop-item.active { color: var(--green); background: var(--green-dim); font-weight: 600; }
-.nav-drop-item .di-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+.nav-drop-item:hover { color: var(--text); background: rgba(255,255,255,.05); }
+.nav-drop-item.active {
+  color: var(--green); background: var(--green-dim);
+  border-color: rgba(0,230,118,.2); font-weight: 600;
+}
+.nav-drop-item .di-icon { font-size: 12px; }
 
-/* Divider inside dropdown */
+/* sub-bar divider between items */
 .nav-drop-sep {
-  height: 1px; background: var(--border); margin: 3px 0;
+  width: 1px; height: 18px; background: var(--border);
+  margin: 0 4px; flex-shrink: 0;
 }
 
-/* Legacy ntab kept for mobile select sync compatibility */
+/* Legacy ntab — hidden, kept for compatibility */
 .ntab { display: none; }
 .nav-updated {
   flex-shrink: 0; display: none; align-items: center; gap: 6px;
@@ -185,7 +194,7 @@ body::before {
   padding: 8px 14px 6px;
   background: rgba(6,8,15,.98);
   border-bottom: 1px solid var(--border);
-  position: sticky; top: 58px; z-index: 250;
+  position: sticky; top: 52px; z-index: 250;
 }
 @media (max-width: 739px) { #mobile-nav-wrap { display: block; } }
 #mobile-nav-select {
@@ -835,68 +844,63 @@ select:focus, input:focus {
 
 <!-- ── TOP NAV ── -->
 <nav id="app-nav">
+
+  <!-- Row 1: brand + group tabs + timestamp -->
   <div class="nav-inner">
     <a class="nav-brand" href="#">
       <div class="nav-logo">108</div>
       <div class="nav-title">THE 108 FBO</div>
     </a>
     <div class="nav-groups" id="nav-groups">
-
-      <!-- Season -->
-      <div class="nav-group">
-        <button class="nav-group-btn" id="grp-season">Season <span class="g-caret">▼</span></button>
-        <div class="nav-dropdown">
-          <button class="nav-drop-item" data-page="standings"><span class="di-icon">📊</span>Standings</button>
-          <button class="nav-drop-item" data-page="matchups"><span class="di-icon">⚔️</span>Matchups</button>
-          <button class="nav-drop-item" data-page="power"><span class="di-icon">⚡</span>Power Rankings</button>
-          <div class="nav-drop-sep"></div>
-          <button class="nav-drop-item" data-page="catking"><span class="di-icon">👑</span>Cat Kings</button>
-          <button class="nav-drop-item" data-page="koh"><span class="di-icon">🏔️</span>King of the Hill</button>
-          <button class="nav-drop-item" data-page="luck"><span class="di-icon">🍀</span>Luck Index</button>
-        </div>
-      </div>
-
-      <!-- Teams -->
-      <div class="nav-group">
-        <button class="nav-group-btn" id="grp-teams">Teams <span class="g-caret">▼</span></button>
-        <div class="nav-dropdown">
-          <button class="nav-drop-item" data-page="rosters"><span class="di-icon">🧢</span>Rosters</button>
-          <button class="nav-drop-item" data-page="legacy"><span class="di-icon">📈</span>Legacy Rankings</button>
-          <button class="nav-drop-item" data-page="resumes"><span class="di-icon">📋</span>Owner Resumes</button>
-        </div>
-      </div>
-
-      <!-- Tools -->
-      <div class="nav-group">
-        <button class="nav-group-btn" id="grp-tools">Tools <span class="g-caret">▼</span></button>
-        <div class="nav-dropdown">
-          <button class="nav-drop-item" data-page="waiver"><span class="di-icon">🎯</span>Waiver Wire</button>
-          <button class="nav-drop-item" data-page="trade"><span class="di-icon">🔄</span>Trade Analyzer</button>
-          <div class="nav-drop-sep"></div>
-          <button class="nav-drop-item" data-page="articles"><span class="di-icon">📰</span>Articles</button>
-        </div>
-      </div>
-
-      <!-- Vault -->
-      <div class="nav-group">
-        <button class="nav-group-btn" id="grp-vault">Vault <span class="g-caret">▼</span></button>
-        <div class="nav-dropdown">
-          <button class="nav-drop-item" data-page="championships"><span class="di-icon">🏆</span>Championships</button>
-          <button class="nav-drop-item" data-page="h2h"><span class="di-icon">🔀</span>H2H Matrix</button>
-          <button class="nav-drop-item" data-page="stats"><span class="di-icon">📉</span>All-Time Stats</button>
-          <button class="nav-drop-item" data-page="records"><span class="di-icon">🗃️</span>League Records</button>
-          <button class="nav-drop-item" data-page="outliers"><span class="di-icon">🔥</span>Outliers</button>
-          <div class="nav-drop-sep"></div>
-          <button class="nav-drop-item" data-page="awards"><span class="di-icon">💩</span>AOTW Awards</button>
-        </div>
-      </div>
-
+      <button class="nav-group-btn active" id="grp-season" onclick="selectGroup('season')">Season</button>
+      <button class="nav-group-btn" id="grp-teams"  onclick="selectGroup('teams')">Teams</button>
+      <button class="nav-group-btn" id="grp-tools"  onclick="selectGroup('tools')">Tools</button>
+      <button class="nav-group-btn" id="grp-vault"  onclick="selectGroup('vault')">Vault</button>
     </div>
     <div class="nav-updated">
       <div class="live-dot"></div>
       <span id="updated-text">Loading...</span>
     </div>
   </div>
+
+  <!-- Row 2: flat sub-page buttons for the active group -->
+  <div class="nav-subbar">
+
+    <div class="nav-sub active" id="sub-season">
+      <button class="nav-drop-item active" data-page="standings"><span class="di-icon">📊</span>Standings</button>
+      <button class="nav-drop-item" data-page="matchups"><span class="di-icon">⚔️</span>Matchups</button>
+      <button class="nav-drop-item" data-page="power"><span class="di-icon">⚡</span>Power Rankings</button>
+      <div class="nav-drop-sep"></div>
+      <button class="nav-drop-item" data-page="catking"><span class="di-icon">👑</span>Cat Kings</button>
+      <button class="nav-drop-item" data-page="koh"><span class="di-icon">🏔️</span>King of the Hill</button>
+      <button class="nav-drop-item" data-page="luck"><span class="di-icon">🍀</span>Luck Index</button>
+    </div>
+
+    <div class="nav-sub" id="sub-teams">
+      <button class="nav-drop-item" data-page="rosters"><span class="di-icon">🧢</span>Rosters</button>
+      <button class="nav-drop-item" data-page="legacy"><span class="di-icon">📈</span>Legacy Rankings</button>
+      <button class="nav-drop-item" data-page="resumes"><span class="di-icon">📋</span>Owner Resumes</button>
+    </div>
+
+    <div class="nav-sub" id="sub-tools">
+      <button class="nav-drop-item" data-page="waiver"><span class="di-icon">🎯</span>Waiver Wire</button>
+      <button class="nav-drop-item" data-page="trade"><span class="di-icon">🔄</span>Trade Analyzer</button>
+      <div class="nav-drop-sep"></div>
+      <button class="nav-drop-item" data-page="articles"><span class="di-icon">📰</span>Articles</button>
+    </div>
+
+    <div class="nav-sub" id="sub-vault">
+      <button class="nav-drop-item" data-page="championships"><span class="di-icon">🏆</span>Championships</button>
+      <button class="nav-drop-item" data-page="h2h"><span class="di-icon">🔀</span>H2H Matrix</button>
+      <button class="nav-drop-item" data-page="stats"><span class="di-icon">📉</span>All-Time Stats</button>
+      <button class="nav-drop-item" data-page="records"><span class="di-icon">🗃️</span>League Records</button>
+      <button class="nav-drop-item" data-page="outliers"><span class="di-icon">🔥</span>Outliers</button>
+      <div class="nav-drop-sep"></div>
+      <button class="nav-drop-item" data-page="awards"><span class="di-icon">💩</span>AOTW Awards</button>
+    </div>
+
+  </div>
+
 </nav>
 
 <!-- ═══════════════════════════════════════════════
@@ -1429,21 +1433,42 @@ const PAGE_GROUP = {
   records:'vault', outliers:'vault', awards:'vault',
 };
 
+// ── SELECT GROUP (without changing page) ────────
+function selectGroup(group) {
+  // Activate group button
+  document.querySelectorAll('.nav-group-btn').forEach(b => {
+    b.classList.toggle('active', b.id === 'grp-' + group);
+  });
+  // Show correct sub-bar
+  document.querySelectorAll('.nav-sub').forEach(s => {
+    s.classList.toggle('active', s.id === 'sub-' + group);
+  });
+  // Navigate to first page in that group if current page isn't in it
+  const currentPage = document.querySelector('.page.active')?.id?.replace('page-', '');
+  if (PAGE_GROUP[currentPage] !== group) {
+    const firstBtn = document.querySelector(`#sub-${group} .nav-drop-item[data-page]`);
+    if (firstBtn) navTo(firstBtn.dataset.page);
+  }
+}
+
 // ── NAVIGATION ──────────────────────────────────
 function navTo(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
 
-  // Update dropdown items
+  // Update sub-item active state
   document.querySelectorAll('.nav-drop-item').forEach(b => {
     b.classList.toggle('active', b.dataset.page === name);
   });
 
-  // Update group buttons
-  const group = PAGE_GROUP[name];
+  // Update group buttons + sub-bars
+  const group = PAGE_GROUP[name] || 'season';
   document.querySelectorAll('.nav-group-btn').forEach(b => {
     b.classList.toggle('active', b.id === 'grp-' + group);
+  });
+  document.querySelectorAll('.nav-sub').forEach(s => {
+    s.classList.toggle('active', s.id === 'sub-' + group);
   });
 
   // Sync mobile dropdown
