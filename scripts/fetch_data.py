@@ -90,7 +90,8 @@ raw_matchups = league_info.get('matchups', [])
 print(f'  {len(raw_matchups)} matchups from leagueInfo')
 
 if raw_matchups:
-    print(f'  Sample: {raw_matchups[0]}')
+    print(f'  Full sample matchup: {json.dumps(raw_matchups[0])}')
+    print(f'  leagueInfo teamInfo keys: {list(league_info.get("teamInfo", {}).keys())[:5]}')
     period_map = {}
     for m in raw_matchups:
         if not isinstance(m, dict): continue
