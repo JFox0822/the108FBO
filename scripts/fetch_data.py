@@ -139,6 +139,11 @@ for wk in schedule:
         rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
         if not rows: continue
         found_any = False
+        # Debug: print raw row for first period to identify category key names
+        if period == 1 and rows:
+            print(f'  DEBUG scoreboard row keys: {list(rows[0].keys()) if rows else []}')
+            print(f'  DEBUG away obj: {json.dumps(rows[0].get("away", {}))[:300] if rows else ""}')
+            print(f'  DEBUG home obj: {json.dumps(rows[0].get("home", {}))[:300] if rows else ""}')
         for row in rows:
             if not isinstance(row, dict): continue
             aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id',''))
