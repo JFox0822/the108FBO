@@ -20,7 +20,20 @@ TEAMS = {
 }
 
 s = requests.Session()
-s.headers.update({'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'})
+s.headers.update({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Origin': 'https://www.fantrax.com',
+    'Referer': 'https://www.fantrax.com/',
+})
+
+# Inject session cookie if provided (get from browser DevTools → Application → Cookies → fantrax.com → JSESSIONID)
+FANTRAX_SESSION = os.environ.get('FANTRAX_SESSION', '')
+if FANTRAX_SESSION:
+    s.cookies.set('JSESSIONID', FANTRAX_SESSION, domain='www.fantrax.com')
+    print('✅ Using FANTRAX_SESSION cookie')
+else:
+    print('⚠️  No FANTRAX_SESSION — score/category endpoints will fail')
 
 def get(path, params=None):
     if params is None: params = {}
@@ -88,6 +101,23 @@ schedule = []
 league_info = get('/fxea/general/getLeagueInfo')
 raw_matchups = league_info.get('matchups', [])
 print(f'  {len(raw_matchups)} matchups from leagueInfo')
+
+# Calculate current scoring period from season start date
+from datetime import date as _date
+current_period = 5  # fallback for 2026
+start_date_str = league_info.get('startDate', '')
+if start_date_str:
+    try:
+        if isinstance(start_date_str, (int, float)):
+            from datetime import datetime as _dt
+            start = _dt.utcfromtimestamp(int(start_date_str) / 1000).date()
+        else:
+            start = _date.fromisoformat(str(start_date_str)[:10])
+        days_in = (_date.today() - start).days
+        current_period = max(1, min(26, (days_in // 7) + 1))
+        print(f'  Season start: {start} → current period: {current_period}')
+    except Exception as e:
+        print(f'  startDate parse failed ({e}), using fallback period {current_period}')
 
 if raw_matchups:
     print(f'  Full sample matchup: {json.dumps(raw_matchups[0])}')
@@ -260,7 +290,8 @@ out_path = 'data.json' if (os.path.isdir('.git') or not os.path.exists(os.path.e
 
 with open(out_path, 'w') as f:
     json.dump({
-        'meta': {'season': 2026, 'updatedDate': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'), 'leagueId': LID},
+        'meta': {'season': 2026, 'updatedDate': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+             'leagueId': LID, 'currentPeriod': current_period},
         'rosters': rosters, 'schedule': schedule, 'standings': standings,
         'leagueHistory': past, 'playerMap': player_map_out,
         'teams': {tid: {'owner': meta['owner']} for tid, meta in TEAMS.items()},
