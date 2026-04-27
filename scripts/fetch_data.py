@@ -135,7 +135,7 @@ for ep, params in [
     ('/fxea/general/getMatchupScores',    {'period': 4}),
     ('/fxea/general/getLiveScoring',      {'scoringPeriod': 4}),
 ]:
-    raw = get(ep, params, label=ep)
+    raw = get(ep, params)
     if not raw:
         print(f'  {ep}: empty')
         continue
