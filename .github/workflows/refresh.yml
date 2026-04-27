@@ -14,7 +14,10 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install requests
-      - run: python scripts/fetch_data.py
+      - name: Run fetch script
+        run: python scripts/fetch_data.py
+        env:
+          FANTRAX_SESSION: ${{ secrets.FANTRAX_SESSION }}
       - run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
