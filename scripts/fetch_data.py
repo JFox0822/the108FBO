@@ -27,14 +27,6 @@ s.headers.update({
     'Referer': 'https://www.fantrax.com/',
 })
 
-# Inject session cookie if provided (get from browser DevTools → Application → Cookies → fantrax.com → JSESSIONID)
-FANTRAX_SESSION = os.environ.get('FANTRAX_SESSION', '')
-if FANTRAX_SESSION:
-    s.cookies.set('JSESSIONID', FANTRAX_SESSION, domain='www.fantrax.com')
-    print('✅ Using FANTRAX_SESSION cookie')
-else:
-    print('⚠️  No FANTRAX_SESSION — score/category endpoints will fail')
-
 def get(path, params=None):
     if params is None: params = {}
     params['leagueId'] = LID
@@ -151,35 +143,6 @@ if raw_matchups:
 
         if period_matchups:
             schedule.append({'period': period, 'matchupList': period_matchups})
-
-# ── PROBE: find which endpoint has scores (using week 4 as test) ──
-print('Probing score endpoints for period 4...')
-for ep, params in [
-    ('/fxea/general/getScoreboard',       {'scoringPeriod': 4, 'timeframeType': 'BY_PERIOD'}),
-    ('/fxea/general/getScoreboard',       {'period': 4, 'season': 2026}),
-    ('/fxea/general/getMatchupResults',   {'period': 4, 'season': 2026}),
-    ('/fxea/general/getMatchupResults',   {'scoringPeriod': 4}),
-    ('/fxea/general/getTeamMatchupInfo',  {'scoringPeriod': 4}),
-    ('/fxea/general/getTeamMatchupInfo',  {'period': 4}),
-    ('/fxea/general/getScoringHistory',   {'scoringPeriod': 4}),
-    ('/fxea/general/getMatchupScores',    {'period': 4}),
-    ('/fxea/general/getLiveScoring',      {'scoringPeriod': 4}),
-]:
-    raw = get(ep, params)
-    if not raw:
-        print(f'  {ep}: empty')
-        continue
-    if isinstance(raw, list):
-        print(f'  {ep}: LIST len={len(raw)}')
-        if raw and isinstance(raw[0], dict):
-            print(f'    keys: {list(raw[0].keys())[:12]}')
-            print(f'    first: {json.dumps(raw[0])[:500]}')
-    elif isinstance(raw, dict):
-        print(f'  {ep}: DICT keys={list(raw.keys())[:12]}')
-        for k, v in raw.items():
-            if isinstance(v, list) and v and isinstance(v[0], dict):
-                print(f'    [{k}] len={len(v)} first keys={list(v[0].keys())[:10]}')
-                print(f'    first: {json.dumps(v[0])[:500]}')
 
 # ── FETCH SCORES for each period ─────────────────
 print('Fetching scores from scoreboard...')
