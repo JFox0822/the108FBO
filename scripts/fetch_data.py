@@ -122,37 +122,65 @@ if raw_matchups:
         if period_matchups:
             schedule.append({'period': period, 'matchupList': period_matchups})
 
-# ── FETCH SCORES for each period via scoreboard ──
+# ── PROBE: find which endpoint has scores (using week 4 as test) ──
+print('Probing score endpoints for period 4...')
+for ep, params in [
+    ('/fxea/general/getScoreboard',       {'scoringPeriod': 4, 'timeframeType': 'BY_PERIOD'}),
+    ('/fxea/general/getScoreboard',       {'period': 4, 'season': 2026}),
+    ('/fxea/general/getMatchupResults',   {'period': 4, 'season': 2026}),
+    ('/fxea/general/getMatchupResults',   {'scoringPeriod': 4}),
+    ('/fxea/general/getTeamMatchupInfo',  {'scoringPeriod': 4}),
+    ('/fxea/general/getTeamMatchupInfo',  {'period': 4}),
+    ('/fxea/general/getScoringHistory',   {'scoringPeriod': 4}),
+    ('/fxea/general/getMatchupScores',    {'period': 4}),
+    ('/fxea/general/getLiveScoring',      {'scoringPeriod': 4}),
+]:
+    raw = get(ep, params, label=ep)
+    if not raw:
+        print(f'  {ep}: empty')
+        continue
+    if isinstance(raw, list):
+        print(f'  {ep}: LIST len={len(raw)}')
+        if raw and isinstance(raw[0], dict):
+            print(f'    keys: {list(raw[0].keys())[:12]}')
+            print(f'    first: {json.dumps(raw[0])[:500]}')
+    elif isinstance(raw, dict):
+        print(f'  {ep}: DICT keys={list(raw.keys())[:12]}')
+        for k, v in raw.items():
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                print(f'    [{k}] len={len(v)} first keys={list(v[0].keys())[:10]}')
+                print(f'    first: {json.dumps(v[0])[:500]}')
+
+# ── FETCH SCORES for each period ─────────────────
 print('Fetching scores from scoreboard...')
 scores_filled = 0
-CAT_KEYS = ['R','HR','RBI','K_bat','SB','AVG','OPS','IP','H_pit','K_pit','QS','ERA','WHIP','SVH']
 
 for wk in schedule:
     period = wk['period']
     for ep, params in [
-        ('/fxea/general/getScoreboard', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
-        ('/fxea/general/getScoreboard', {'period': period, 'season': 2026}),
+        ('/fxea/general/getScoreboard',      {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
+        ('/fxea/general/getScoreboard',      {'period': period, 'season': 2026}),
+        ('/fxea/general/getMatchupResults',  {'period': period, 'season': 2026}),
+        ('/fxea/general/getMatchupResults',  {'scoringPeriod': period}),
         ('/fxea/general/getTeamMatchupInfo', {'scoringPeriod': period}),
+        ('/fxea/general/getTeamMatchupInfo', {'period': period}),
+        ('/fxea/general/getLiveScoring',     {'scoringPeriod': period}),
     ]:
         raw = get(ep, params)
         if not raw: continue
-        rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
+        rows = raw if isinstance(raw, list) else raw.get(
+            'matchupList', raw.get('matchups', raw.get('results', raw.get('scoreboard', []))))
         if not rows: continue
         found_any = False
-        # Debug: print raw row for first period to identify category key names
-        if period == 1 and rows:
-            print(f'  DEBUG scoreboard row keys: {list(rows[0].keys()) if rows else []}')
-            print(f'  DEBUG away obj: {json.dumps(rows[0].get("away", {}))[:300] if rows else ""}')
-            print(f'  DEBUG home obj: {json.dumps(rows[0].get("home", {}))[:300] if rows else ""}')
         for row in rows:
             if not isinstance(row, dict): continue
-            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id',''))
-            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id',''))
+            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id', ''))
+            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id', ''))
             if not aid or not hid: continue
             for m in wk['matchupList']:
                 if m['away']['id'] == aid and m['home']['id'] == hid:
                     away_obj = row.get('away', {}) or {}
-                    home_obj  = row.get('home', {}) or {}
+                    home_obj = row.get('home', {}) or {}
                     away_s = (row.get('awayScore') or row.get('awayCatWins') or
                               away_obj.get('score') or away_obj.get('catWins'))
                     home_s = (row.get('homeScore') or row.get('homeCatWins') or
@@ -162,23 +190,20 @@ for wk in schedule:
                         m['homeScore'] = home_s
                         scores_filled += 1
                         found_any = True
-                    # Per-category stats — try common key variants
-                    cats = (row.get('categoryStats') or row.get('categories') or
-                            row.get('stats') or row.get('catStats'))
-                    if cats and isinstance(cats, dict):
+                    a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
+                    h_stats = home_obj.get('stats') or home_obj.get('categoryStats') or {}
+                    cats = row.get('categoryStats') or row.get('categories') or row.get('stats') or {}
+                    if a_stats or h_stats:
+                        m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
+                                           for k in set(list(a_stats.keys()) + list(h_stats.keys()))}
+                    elif cats:
                         m['categories'] = cats
-                    elif away_obj.get('stats') or away_obj.get('categoryStats'):
-                        # Stats stored per-team: build combined dict
-                        a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
-                        h_stats = home_obj.get('stats') or home_obj.get('categoryStats') or {}
-                        if a_stats or h_stats:
-                            m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
-                                               for k in set(list(a_stats.keys()) + list(h_stats.keys()))}
                     break
         if found_any:
             break
 
-print(f'  {len(schedule)} weeks in schedule · {scores_filled} scores filled')
+print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
+
 
 # ── STANDINGS ─────────────────────────────────────
 print('Fetching standings...')
