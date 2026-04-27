@@ -2128,15 +2128,12 @@ async function renderMatchups() {
       o.textContent = 'Week ' + w.period;
       sel.appendChild(o);
     });
-    // Current week = first week where no matchup has a score yet
-    // Fallback = last week that has scores
-    const currentWk = D.schedule.find(w =>
-      w.matchupList?.every(m => m.awayScore == null && m.homeScore == null)
-    );
-    const lastScored = [...D.schedule].reverse().find(w =>
-      w.matchupList?.some(m => m.awayScore != null || m.homeScore != null)
-    );
-    sel.value = currentWk?.period || lastScored?.period || D.schedule[0]?.period || 1;
+    // Default to currentPeriod from meta, else first week with no scores, else last scored week
+    const metaPeriod = D.meta?.currentPeriod;
+    const currentWk = D.schedule.find(w => w.period === metaPeriod)
+      || D.schedule.find(w => w.matchupList?.every(m => m.awayScore == null && m.homeScore == null))
+      || [...D.schedule].reverse().find(w => w.matchupList?.some(m => m.awayScore != null));
+    sel.value = currentWk?.period || D.schedule[0]?.period || 1;
   }
 
   fetchProbablePitchers().then(() => { winProbCache = {}; renderMatchupCards(); });
