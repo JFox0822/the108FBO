@@ -10,39 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-playwright-requests
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-v1
-
-      - name: Install dependencies
-        run: pip install requests playwright
-
-      - name: Install Chromium (only if not cached)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: playwright install chromium --with-deps
-
-      - name: Install Chromium system deps (always needed)
-        run: playwright install-deps chromium
-
+      - run: pip install requests
       - name: Run fetch script
         run: python scripts/fetch_data.py
-
-      - name: Commit and push
-        run: |
+      - run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add data.json
