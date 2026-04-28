@@ -1,4 +1,4 @@
-import json, os, sys, asyncio
+import json, os, sys
 from datetime import datetime, date as _date
 
 LID  = 'ai1iqnl9mg6kvw0f'
@@ -169,98 +169,61 @@ named = sum(1 for p in player_map_out.values() if p['name'] and not p['name'].st
 print('Fetching scores via headless browser...')
 
 async def fetch_scores_playwright():
-    try:
-        from playwright.async_api import async_playwright
-    except ImportError:
-        print('  Playwright not installed')
-        return {}
+    return []
 
-    scores = {}  # period -> list of matchup score dicts
+captured = []
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True)
-        ctx = await browser.new_context(
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        )
-        page = await ctx.new_page()
+# ── FETCH SCORES: try getTeamStats per period ────
+print('Fetching scores...')
+scores_filled = 0
 
-        # Intercept all API responses from Fantrax
-        captured = []
-        async def handle_response(response):
-            url = response.url
-            if 'fxea/general/' in url and ('Scoreboard' in url or 'Matchup' in url or
-                                            'liveScoring' in url or 'LiveScoring' in url or
-                                            'scoring' in url.lower()):
-                try:
-                    data = await response.json()
-                    captured.append({'url': url, 'data': data})
-                    print(f'  Captured: {url.split("?")[0].split("/")[-1]} → keys: {list(data.keys())[:8] if isinstance(data, dict) else f"list({len(data)})"}')
-                except: pass
-
-        page.on('response', handle_response)
-
-        # Load the public live scoring page for current week
-        target_url = f'{BASE}/fantasy/league/{LID}/livescoring'
-        print(f'  Loading {target_url}')
-        try:
-            await page.goto(target_url, wait_until='networkidle', timeout=30000)
-            await page.wait_for_timeout(3000)  # let lazy requests finish
-        except Exception as e:
-            print(f'  Page load error: {e}')
-
-        # Also try navigating to specific scoring periods
-        for period in range(1, current_period + 1):
-            try:
-                period_url = f'{BASE}/fantasy/league/{LID}/livescoring?scoringPeriod={period}'
-                await page.goto(period_url, wait_until='networkidle', timeout=20000)
-                await page.wait_for_timeout(1000)
-            except: pass
-
-        print(f'  Total captured responses: {len(captured)}')
-        for cap in captured:
-            print(f'  → {cap["url"].split("?")[0].split("/")[-1]}: {json.dumps(cap["data"])[:300]}')
-
-        await browser.close()
-    return captured
-
-captured = asyncio.run(fetch_scores_playwright())
-
-# Parse captured responses into schedule
-for cap in captured:
-    data = cap.get('data', {})
-    rows = data if isinstance(data, list) else data.get('matchupList', data.get('matchups', []))
-    if not rows: continue
-    for row in rows:
-        if not isinstance(row, dict): continue
-        period = row.get('period', row.get('scoringPeriod', 0))
-        matchups_in = row.get('matchupList', [row])
-        for m_row in matchups_in:
-            if not isinstance(m_row, dict): continue
-            aid = (m_row.get('awayTeamId') or (m_row.get('away') or {}).get('id', ''))
-            hid = (m_row.get('homeTeamId') or (m_row.get('home') or {}).get('id', ''))
+for wk in schedule:
+    period = wk['period']
+    for ep, params in [
+        ('/fxea/general/getTeamStats', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD', 'teamId': 'ALL'}),
+        ('/fxea/general/getTeamStats', {'period': period, 'timeframeType': 'BY_PERIOD'}),
+        ('/fxea/general/getTeamStats', {'scoringPeriod': period, 'statsType': 'STATS'}),
+        ('/fxea/general/getScoreboard', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
+        ('/fxea/general/getScoreboard', {'period': period}),
+    ]:
+        raw = get(ep, params)
+        if not raw or list(raw.keys()) == ['error']: continue
+        # Log what we get for period 4 (known to have scores)
+        if period == 4:
+            print(f'  Period 4 hit: {ep} → keys: {list(raw.keys())[:10]}')
+            print(f'  Sample: {json.dumps(raw)[:400]}')
+        rows = raw if isinstance(raw, list) else raw.get(
+            'matchupList', raw.get('matchups', raw.get('teamStatsList', raw.get('stats', []))))
+        if not rows: continue
+        found_any = False
+        for row in rows:
+            if not isinstance(row, dict): continue
+            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id', ''))
+            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id', ''))
             if not aid or not hid: continue
-            away_obj = m_row.get('away', {}) or {}
-            home_obj = m_row.get('home', {}) or {}
-            away_s = (m_row.get('awayScore') or m_row.get('awayCatWins') or
-                      away_obj.get('score') or away_obj.get('catWins'))
-            home_s = (m_row.get('homeScore') or m_row.get('homeCatWins') or
-                      home_obj.get('score') or home_obj.get('catWins'))
-            a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
-            h_stats = home_obj.get('stats') or home_obj.get('categoryStats') or {}
-            # Find matching week+matchup and update
-            for wk in schedule:
-                if period and wk['period'] != period: continue
-                for mm in wk['matchupList']:
-                    if mm['away']['id'] == aid and mm['home']['id'] == hid:
-                        if away_s is not None: mm['awayScore'] = away_s
-                        if home_s is not None: mm['homeScore'] = home_s
-                        if a_stats or h_stats:
-                            mm['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
-                                               for k in set(list(a_stats.keys()) + list(h_stats.keys()))}
-                        break
+            for m in wk['matchupList']:
+                if m['away']['id'] == aid and m['home']['id'] == hid:
+                    away_obj = row.get('away', {}) or {}
+                    home_obj = row.get('home', {}) or {}
+                    away_s = (row.get('awayScore') or row.get('awayCatWins') or
+                              away_obj.get('score') or away_obj.get('catWins'))
+                    home_s = (row.get('homeScore') or row.get('homeCatWins') or
+                              home_obj.get('score') or home_obj.get('catWins'))
+                    if away_s is not None or home_s is not None:
+                        m['awayScore'] = away_s
+                        m['homeScore'] = home_s
+                        scores_filled += 1
+                        found_any = True
+                    a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
+                    h_stats = home_obj.get('stats') or home_obj.get('categoryStats') or {}
+                    if a_stats or h_stats:
+                        m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
+                                           for k in set(list(a_stats.keys()) + list(h_stats.keys()))}
+                    break
+        if found_any:
+            break
 
-scores_filled = sum(1 for wk in schedule for m in wk['matchupList'] if m.get('awayScore') is not None)
-print(f'  Scores filled: {scores_filled}')
+print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
 
 # ── OUTPUT ───────────────────────────────────────────────────────────────────
 out_path = 'data.json' if (os.path.isdir('.git') or not os.path.exists(os.path.expanduser('~/the108fbo/public'))) \
