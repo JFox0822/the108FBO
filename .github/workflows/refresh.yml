@@ -13,12 +13,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: pip install requests
+      - name: Install dependencies
+        run: |
+          pip install requests playwright
+          playwright install chromium --with-deps
       - name: Run fetch script
         run: python scripts/fetch_data.py
-        env:
-          FANTRAX_SESSION: ${{ secrets.FANTRAX_SESSION }}
-      - run: |
+      - name: Commit and push
+        run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add data.json
