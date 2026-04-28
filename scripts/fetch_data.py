@@ -94,6 +94,75 @@ league_info = get('/fxea/general/getLeagueInfo')
 raw_matchups = league_info.get('matchups', [])
 print(f'  {len(raw_matchups)} matchups from leagueInfo')
 
+# ── EXPLORE leagueInfo for hidden score data ──────
+print('  leagueInfo top-level keys:', list(league_info.keys()))
+# teamInfo might contain per-team scores
+team_info = league_info.get('teamInfo', {})
+if team_info:
+    sample_tid = next(iter(team_info))
+    print(f'  teamInfo sample ({sample_tid}): {json.dumps(team_info[sample_tid])[:400]}')
+# scoringSystem has category definitions
+scoring = league_info.get('scoringSystem', {})
+if scoring:
+    print(f'  scoringSystem keys: {list(scoring.keys())[:15]}')
+    print(f'  scoringSystem sample: {json.dumps(scoring)[:500]}')
+
+# ── SCRAPE public live scoring HTML for embedded JSON ──
+print('Scraping public live scoring page for embedded data...')
+try:
+    import re as _re
+    live_url = f'https://www.fantrax.com/fantasy/league/{LID}/livescoring'
+    lr = s.get(live_url, timeout=30, headers={
+        'Accept': 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+    })
+    if lr.status_code == 200:
+        html = lr.text
+        print(f'  Got HTML ({len(html)} chars)')
+        # Look for embedded JSON blobs (window.__STATE__, window.Fantrax, etc.)
+        for pattern in [
+            r'window\.__(?:INITIAL_STATE|STATE|DATA|FANTRAX)[^=]*=\s*({.{50,}})',
+            r'window\.fantraxData\s*=\s*({.{50,}})',
+            r'"matchupList"\s*:\s*\[({.{50,}})\]',
+            r'"scoringPeriod"\s*:\s*(\d+)',
+            r'"catScore[sS]"\s*:\s*({.{20,}})',
+        ]:
+            m = _re.search(pattern, html)
+            if m:
+                print(f'  Found pattern {pattern[:40]}: {m.group(0)[:300]}')
+                break
+        else:
+            print('  No embedded JSON state found in HTML')
+            # Check if scores appear in raw HTML at all
+            if 'catScore' in html or 'awayScore' in html or 'homeScore' in html:
+                print('  Score-related keys found in HTML source!')
+            # Look for any JSON-like blobs near "score"
+            score_contexts = [html[max(0,m.start()-50):m.start()+200] 
+                             for m in _re.finditer(r'"score"', html)][:3]
+            for ctx in score_contexts:
+                print(f'  Score context: {ctx[:200]}')
+    else:
+        print(f'  Live scoring page returned {lr.status_code}')
+except Exception as e:
+    print(f'  HTML scrape failed: {e}')
+
+# ── TRY alternate API paths ───────────────────────
+print('Trying alternate score endpoints...')
+for ep, params in [
+    ('/fxea/general/getLeagueStandings',   {'season': 2026}),
+    ('/fxea/general/getMatchupList',        {'season': 2026}),
+    ('/fxea/general/getPeriodStats',        {'scoringPeriod': 4}),
+    ('/fxea/general/getTeamStats',          {'scoringPeriod': 4, 'timeframeType': 'BY_PERIOD'}),
+    ('/fxea/general/getLeagueScoringHistory',{'season': 2026}),
+    ('/fxea/general/getRoster',             {'scoringPeriod': 4}),
+]:
+    raw = get(ep, params)
+    if raw and raw != {'error': True} and list(raw.keys()) != ['error']:
+        print(f'  ✅ {ep}: {list(raw.keys())[:8]}')
+        print(f'     {json.dumps(raw)[:400]}')
+    else:
+        print(f'  ✗ {ep}: empty/error')
+
 # Calculate current scoring period from season start date
 from datetime import date as _date
 current_period = 5  # fallback for 2026
