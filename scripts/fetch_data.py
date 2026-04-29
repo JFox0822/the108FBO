@@ -170,9 +170,45 @@ named = sum(1 for p in player_map_out.values() if p['name'] and not p['name'].st
 # Compare matched-up teams' stats to determine category winners and overall H2H score.
 print('Fetching per-period team stats...')
 scores_filled = 0
+period_stats_cache = {}
 
-# Probe period 4 first to find the right params
-period_stats_cache = {}  # period -> {teamId -> {stat: value}}
+# Targeted probe for period 1 — try every plausible endpoint/param combo
+print('Probing for period 1 results...')
+for ep, params in [
+    # getLeagueInfo with scoringPeriod might return scores embedded
+    ('/fxea/general/getLeagueInfo', {'scoringPeriod': 1}),
+    ('/fxea/general/getLeagueInfo', {'period': 1}),
+    # getStandings variants
+    ('/fxea/general/getStandings', {'scoringPeriod': 1}),
+    ('/fxea/general/getStandings', {'scoringPeriod': 1, 'season': 2026}),
+    # Roster with period — might have player stats
+    ('/fxea/general/getTeamRosters', {'scoringPeriod': 1}),
+    ('/fxea/general/getTeamRosters', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'}),
+    # Other potential endpoints
+    ('/fxea/general/getMatchupScorecard', {'scoringPeriod': 1}),
+    ('/fxea/general/getScorecardInfo', {'scoringPeriod': 1}),
+    ('/fxea/general/getMatchupSummary', {'scoringPeriod': 1}),
+    ('/fxea/general/getTeamMatchupHistory', {'scoringPeriod': 1}),
+    ('/fxea/general/getLeagueHistory', {'scoringPeriod': 1}),
+    ('/fxea/general/getH2HResults', {'scoringPeriod': 1}),
+    ('/fxea/general/getMatchupDetail', {'scoringPeriod': 1}),
+    ('/fxea/general/getWeeklyResults', {'scoringPeriod': 1}),
+    ('/fxea/general/getScoringPeriodInfo', {'scoringPeriod': 1}),
+    ('/fxea/general/getBoxScore', {'scoringPeriod': 1}),
+    ('/fxea/general/getMatchupBoxScore', {'scoringPeriod': 1}),
+]:
+    raw = get(ep, params)
+    if not raw: continue
+    if isinstance(raw, dict) and list(raw.keys()) == ['error']: continue
+    # Got something! Print it
+    print(f'  ✅ {ep} {params}')
+    if isinstance(raw, list):
+        print(f'     LIST len={len(raw)}, first keys={list(raw[0].keys())[:12] if raw and isinstance(raw[0],dict) else "?"}')
+        if raw and isinstance(raw[0], dict):
+            print(f'     first: {json.dumps(raw[0])[:400]}')
+    else:
+        print(f'     DICT keys={list(raw.keys())[:12]}')
+        print(f'     data: {json.dumps(raw)[:400]}')
 
 def get_period_stats(period):
     if period in period_stats_cache:
