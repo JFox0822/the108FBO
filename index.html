@@ -2193,7 +2193,7 @@ const HIT_CATS = [
 ];
 const PIT_CATS = [
   {key:'IP',   label:'IP',     low:false, fmt:v=>(+v).toFixed(1)},
-  {key:'HA',   label:'H',      low:true,  fmt:v=>Math.round(v)+''},
+  {key:'H',    label:'H',      low:true,  fmt:v=>Math.round(v)+''},
   {key:'K',    label:'K',      low:false, fmt:v=>Math.round(v)+''},
   {key:'QS',   label:'QS',     low:false, fmt:v=>Math.round(v)+''},
   {key:'ERA',  label:'ERA',    low:true,  fmt:v=>(+v).toFixed(2)},
@@ -2243,8 +2243,17 @@ function renderCards(week, period, weekDates, catLookup) {
 
     const leadText = hasScore ? (aWin ? m.away.name+' LEADING' : hWin ? m.home.name+' LEADING' : 'TIED') : 'WK '+period;
 
-    const aStats = catEntry?.away || {};
-    const hStats = catEntry?.home || {};
+    // Categories: live API first, then data.json pre-calculated cats
+    let aStats = catEntry?.away || {};
+    let hStats  = catEntry?.home || {};
+    if (Object.keys(aStats).length === 0 && m.categories) {
+      Object.entries(m.categories).forEach(([cat, vals]) => {
+        if (vals && typeof vals === 'object') {
+          aStats[cat] = vals.away;
+          hStats[cat]  = vals.home;
+        }
+      });
+    }
     const hasCats = Object.keys(aStats).length > 0;
 
     const scoreBlock = hasScore
