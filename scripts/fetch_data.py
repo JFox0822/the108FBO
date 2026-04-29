@@ -1,8 +1,11 @@
-import json, os, sys
+import requests, json, os, pickle, time
 from datetime import datetime, date as _date
 
-LID  = 'ai1iqnl9mg6kvw0f'
-BASE = 'https://www.fantrax.com'
+EMAIL    = os.environ.get('FANTRAX_EMAIL', 'jacob.g.fox5@gmail.com')
+PASSWORD = os.environ.get('FANTRAX_PASSWORD', '..Rubygirl01')
+LID      = 'ai1iqnl9mg6kvw0f'
+BASE     = 'https://www.fantrax.com'
+COOKIE_FILE = '/tmp/fantrax.cookie'
 
 TEAMS = {
   'f104x6bcmg6kvw0j': {'name': 'Alaskan Blue Balls',           'owner': 'John'},
@@ -19,8 +22,10 @@ TEAMS = {
   's66x2h9nmg6kvw0o': {'name': 'Florida Easy Money',          'owner': 'Aaron'},
 }
 
-# ── PART 1: requests-based fetches (public endpoints) ───────────────────────
-import requests
+CAT_LOWER = {'SO', 'H', 'ERA', 'WHIP'}
+ALL_CATS  = ['R','HR','RBI','SO','SB','AVG','OPS','IP','H','K','QS','ERA','WHIP','SVH']
+
+# ── SESSION ───────────────────────────────────────
 s = requests.Session()
 s.headers.update({
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -40,7 +45,89 @@ def get(path, params=None):
         return {}
     except: return {}
 
-# Player ADP
+# ── SELENIUM LOGIN ────────────────────────────────
+def selenium_login():
+    """Login via headless Chrome and return session cookies."""
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver import Keys
+
+    print('Logging in via Selenium...')
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+
+    try:
+        driver = webdriver.Chrome(options=options)
+        driver.get('https://www.fantrax.com/login')
+
+        # Fill credentials
+        email_box = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@formcontrolname='email']"))
+        )
+        email_box.send_keys(EMAIL)
+
+        pass_box = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.XPATH, "//input[@formcontrolname='password']"))
+        )
+        pass_box.send_keys(PASSWORD)
+        pass_box.send_keys(Keys.ENTER)
+
+        time.sleep(6)  # Wait for login to complete
+
+        cookies = driver.get_cookies()
+        driver.quit()
+
+        # Save cookies
+        with open(COOKIE_FILE, 'wb') as f:
+            pickle.dump(cookies, f)
+
+        # Load into requests session
+        for c in cookies:
+            s.cookies.set(c['name'], c['value'], domain=c.get('domain', '.fantrax.com'))
+
+        print(f'  ✅ Logged in, got {len(cookies)} cookies')
+        return True
+    except Exception as e:
+        print(f'  ❌ Selenium login failed: {e}')
+        try: driver.quit()
+        except: pass
+        return False
+
+def load_saved_cookies():
+    """Load previously saved cookies into session."""
+    if os.path.exists(COOKIE_FILE):
+        with open(COOKIE_FILE, 'rb') as f:
+            for c in pickle.load(f):
+                s.cookies.set(c['name'], c['value'], domain=c.get('domain', '.fantrax.com'))
+        return True
+    return False
+
+# Try saved cookies first, then login
+if not load_saved_cookies():
+    selenium_login()
+else:
+    print('Using saved cookies')
+
+# Test auth
+test = get('/fxea/general/getScoreboard', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'})
+if not test or list(test.keys()) == ['error']:
+    print('Saved cookies expired — re-logging in')
+    selenium_login()
+    test = get('/fxea/general/getScoreboard', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'})
+
+print(f'Auth test: {list(test.keys())[:6] if test else "failed"}')
+if test and list(test.keys()) != ['error']:
+    print(f'  ✅ Authenticated! Sample: {json.dumps(test)[:300]}')
+
+# ── PLAYER ADP ────────────────────────────────────
 print('Fetching player ADP...')
 player_map = {}
 for start in range(0, 1600, 100):
@@ -57,7 +144,7 @@ for start in range(0, 1600, 100):
     except: break
 print(f'  {len(player_map)} players loaded')
 
-# Rosters
+# ── ROSTERS ───────────────────────────────────────
 print('Fetching rosters...')
 rosters_raw = get('/fxea/general/getTeamRosters')
 rosters = {}
@@ -84,7 +171,7 @@ for tid, meta in TEAMS.items():
         rosters[tid] = {'id': tid, 'name': meta['name'], 'owner': meta['owner'], 'players': []}
 print(f'  {len(rosters)} teams')
 
-# Schedule from leagueInfo
+# ── SCHEDULE ──────────────────────────────────────
 print('Fetching schedule...')
 league_info = get('/fxea/general/getLeagueInfo')
 raw_matchups = league_info.get('matchups', [])
@@ -96,7 +183,7 @@ if start_date_str:
     try:
         if isinstance(start_date_str, (int, float)):
             from datetime import datetime as _dt
-            start = _dt.utcfromtimestamp(int(start_date_str) / 1000).date()
+            start = _dt.utcfromtimestamp(int(start_date_str)/1000).date()
         else:
             start = _date.fromisoformat(str(start_date_str)[:10])
         days_in = (_date.today() - start).days
@@ -122,9 +209,55 @@ for period_obj in raw_matchups:
         })
     if period_matchups:
         schedule.append({'period': period, 'matchupList': period_matchups})
-print(f'  {len(schedule)} weeks built')
+print(f'  {len(schedule)} weeks')
 
-# Standings
+# ── SCORES & CATEGORIES ───────────────────────────
+print('Fetching scores...')
+scores_filled = 0
+for wk in schedule:
+    period = wk['period']
+    for ep, params in [
+        ('/fxea/general/getScoreboard',      {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
+        ('/fxea/general/getScoreboard',      {'period': period}),
+        ('/fxea/general/getMatchupResults',  {'scoringPeriod': period}),
+        ('/fxea/general/getTeamMatchupInfo', {'scoringPeriod': period}),
+        ('/fxea/general/getLiveScoring',     {'scoringPeriod': period}),
+    ]:
+        raw = get(ep, params)
+        if not raw or (isinstance(raw, dict) and list(raw.keys()) == ['error']): continue
+        rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
+        if not rows: continue
+        if period <= 2:
+            print(f'  Period {period} hit via {ep}: keys={list(rows[0].keys())[:10] if rows and isinstance(rows[0],dict) else "?"}')
+            if rows and isinstance(rows[0], dict):
+                print(f'  sample: {json.dumps(rows[0])[:400]}')
+        found = False
+        for row in rows:
+            if not isinstance(row, dict): continue
+            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id',''))
+            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id',''))
+            if not aid or not hid: continue
+            for m in wk['matchupList']:
+                if m['away']['id'] == aid and m['home']['id'] == hid:
+                    away_obj = row.get('away', {}) or {}
+                    home_obj  = row.get('home', {}) or {}
+                    away_s = (row.get('awayScore') or row.get('awayCatWins') or
+                              away_obj.get('score') or away_obj.get('catWins'))
+                    home_s = (row.get('homeScore') or row.get('homeCatWins') or
+                              home_obj.get('score') or home_obj.get('catWins'))
+                    if away_s is not None: m['awayScore'] = away_s
+                    if home_s is not None: m['homeScore'] = home_s
+                    a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
+                    h_stats  = home_obj.get('stats') or home_obj.get('categoryStats') or {}
+                    if a_stats or h_stats:
+                        m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
+                                           for k in set(list(a_stats)+list(h_stats))}
+                        scores_filled += 1
+                    found = True; break
+        if found: break
+print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
+
+# ── STANDINGS ─────────────────────────────────────
 print('Fetching standings...')
 standings = []
 rows = []
@@ -139,174 +272,33 @@ for row in rows:
     pts = row.get('points', '')
     if isinstance(pts, str) and '-' in pts:
         parts = pts.split('-')
-        try: w, l, t = int(parts[0]), int(parts[1]), (int(parts[2]) if len(parts) > 2 else 0)
+        try: w, l, t = int(parts[0]), int(parts[1]), (int(parts[2]) if len(parts)>2 else 0)
         except: pass
-    total = w + l + t
+    total = w+l+t
     standings.append({
-        'teamId': row.get('teamId', ''), 'teamName': row.get('teamName', ''),
+        'teamId': row.get('teamId',''), 'teamName': row.get('teamName',''),
         'points': f'{w}-{l}-{t}', 'wins': w, 'losses': l, 'ties': t,
-        'winPercentage': round(w/total, 4) if total else 0.0,
-        'gamesBack': row.get('gamesBack', 0), 'streak': row.get('streak', ''),
-        'rank': row.get('rank', 0),
+        'winPercentage': round(w/total,4) if total else 0.0,
+        'gamesBack': row.get('gamesBack',0), 'streak': row.get('streak',''),
+        'rank': row.get('rank',0),
     })
 standings.sort(key=lambda r: (-r['wins'], r['losses']))
 print(f'  {len(standings)} teams')
 
-# Past seasons
+# ── PAST SEASONS ──────────────────────────────────
 print('Fetching past seasons...')
 past = {}
-for season in ['2022', '2023', '2024', '2025']:
+for season in ['2022','2023','2024','2025']:
     raw = get('/fxea/general/getStandings', {'season': season})
     rows2 = raw if isinstance(raw, list) else raw.get('standings', [])
     if isinstance(rows2, dict): rows2 = list(rows2.values())
     past[season] = rows2
 
-player_map_out = {pid: {'name': p.get('name',''), 'pos': p.get('pos','?'), 'adp': p.get('ADP', 999)}
+# ── OUTPUT ────────────────────────────────────────
+player_map_out = {pid: {'name': p.get('name',''), 'pos': p.get('pos','?'), 'adp': p.get('ADP',999)}
                   for pid, p in player_map.items()}
 named = sum(1 for p in player_map_out.values() if p['name'] and not p['name'].startswith('ID:'))
 
-# ── SCORES: get per-period team stats from getStandings ──────────────────────
-# Strategy: getStandings with scoringPeriod=N returns each team's stats for that period.
-# Compare matched-up teams' stats to determine category winners and overall H2H score.
-print('Fetching per-period team stats...')
-scores_filled = 0
-period_stats_cache = {}
-
-# Targeted probe for period 1 — try every plausible endpoint/param combo
-print('Probing for period 1 results...')
-RHINO_ID = 'tbwrxqepmg6kvw0l'
-for ep, params in [
-    ('/fxea/general/getStandings', {'teamId': RHINO_ID}),
-    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'season': 2026}),
-    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'view': 'SCHEDULE'}),
-    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'view': 'SCHEDULE', 'season': 2026}),
-    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'timeframeType': 'BY_PERIOD'}),
-    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'type': 'SCHEDULE'}),
-    ('/fxea/general/getLeagueInfo',  {'teamId': RHINO_ID}),
-    ('/fxea/general/getMatchups',    {'teamId': RHINO_ID, 'season': 2026}),
-]:
-    raw = get(ep, params)
-    if not raw: continue
-    if isinstance(raw, dict) and list(raw.keys()) == ['error']: continue
-    # Got something! Print it
-    print(f'  ✅ {ep} {params}')
-    if isinstance(raw, list):
-        print(f'     LIST len={len(raw)}, first keys={list(raw[0].keys())[:12] if raw and isinstance(raw[0],dict) else "?"}')
-        if raw and isinstance(raw[0], dict):
-            print(f'     first: {json.dumps(raw[0])[:400]}')
-    else:
-        print(f'     DICT keys={list(raw.keys())[:12]}')
-        print(f'     data: {json.dumps(raw)[:400]}')
-
-def get_period_stats(period):
-    if period in period_stats_cache:
-        return period_stats_cache[period]
-    for params in [
-        {'scoringPeriod': period, 'season': 2026},
-        {'scoringPeriod': period},
-        {'period': period, 'season': 2026},
-        {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'},
-    ]:
-        raw = get('/fxea/general/getStandings', params)
-        if not raw or (isinstance(raw, dict) and list(raw.keys()) == ['error']): continue
-        rows = raw if isinstance(raw, list) else raw.get('standings', raw.get('teams', []))
-        if isinstance(rows, dict): rows = list(rows.values())
-        if not rows: continue
-        sample = rows[0]
-        has_cats = any(k in sample for k in ['R','HR','RBI','ERA','WHIP','IP','AVG','OPS'])
-        if has_cats:
-            result = {row.get('teamId',''): row for row in rows if isinstance(row, dict)}
-            period_stats_cache[period] = result
-            if period == 4:
-                print(f'  ✅ Period 4 stats found! keys: {list(sample.keys())[:15]}')
-                print(f'  Sample: {json.dumps(sample)[:400]}')
-            return result
-
-    # Fallback: try getTeamRosters with scoringPeriod to get player-level stats
-    for params in [
-        {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'},
-        {'scoringPeriod': period},
-    ]:
-        raw = get('/fxea/general/getTeamRosters', params)
-        if not raw or (isinstance(raw, dict) and list(raw.keys()) == ['error']): continue
-        rosters_data = raw.get('rosters', {})
-        if not rosters_data: continue
-        # Check if players have stats
-        sample_team = next(iter(rosters_data.values()), {})
-        sample_player = next(iter(sample_team.get('rosterItems', [])), {})
-        if period == 4:
-            print(f'  Roster player keys: {list(sample_player.keys())[:15]}')
-            print(f'  Roster player: {json.dumps(sample_player)[:300]}')
-        has_stats = any(k in sample_player for k in ['R','HR','RBI','ERA','stats','categoryStats'])
-        if has_stats:
-            # Aggregate player stats to team level
-            result = {}
-            for tid, tdata in rosters_data.items():
-                team_agg = {c: 0.0 for c in ALL_CATS}
-                for player in tdata.get('rosterItems', []):
-                    for cat in ALL_CATS:
-                        v = player.get(cat) or (player.get('stats') or {}).get(cat)
-                        if v is not None:
-                            try: team_agg[cat] += float(v)
-                            except: pass
-                result[tid] = team_agg
-            period_stats_cache[period] = result
-            return result
-    if period == 4:
-        # Debug: show what we DO get for period 4
-        raw = get('/fxea/general/getStandings', {'season': 2026})
-        print(f'  Regular getStandings type: {type(raw).__name__}')
-        rows = raw if isinstance(raw, list) else raw.get('standings', []) if isinstance(raw, dict) else []
-        if isinstance(rows, dict): rows = list(rows.values())
-        if rows:
-            print(f'  Regular row keys: {list(rows[0].keys())}')
-            print(f'  Regular sample: {json.dumps(rows[0])[:400]}')
-    return {}
-
-# SCORING CATEGORIES — lower is better for SO(bat), H(pit), ERA, WHIP
-CAT_LOWER = {'SO', 'H', 'ERA', 'WHIP'}
-ALL_CATS = ['R','HR','RBI','SO','SB','AVG','OPS','IP','H','K','QS','ERA','WHIP','SVH']
-
-for wk in schedule:
-    period = wk['period']
-    team_stats = get_period_stats(period)
-    if not team_stats:
-        continue
-    for m in wk['matchupList']:
-        a_row = team_stats.get(m['away']['id'], {})
-        h_row = team_stats.get(m['home']['id'], {})
-        if not a_row or not h_row:
-            continue
-        # Calculate category wins
-        a_wins = h_wins = ties = 0
-        cats = {}
-        for cat in ALL_CATS:
-            av = a_row.get(cat)
-            hv = h_row.get(cat)
-            if av is None or hv is None:
-                continue
-            try:
-                av_f, hv_f = float(av), float(hv)
-            except:
-                continue
-            cats[cat] = {'away': av_f, 'home': hv_f}
-            lower_better = cat in CAT_LOWER
-            if av_f == hv_f:
-                ties += 1
-            elif (lower_better and av_f < hv_f) or (not lower_better and av_f > hv_f):
-                a_wins += 1
-            else:
-                h_wins += 1
-        if a_wins + h_wins + ties > 0:
-            m['awayScore'] = a_wins
-            m['homeScore'] = h_wins
-            m['categories'] = cats
-            scores_filled += 1
-
-print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
-
-
-# ── OUTPUT ───────────────────────────────────────────────────────────────────
 out_path = 'data.json' if (os.path.isdir('.git') or not os.path.exists(os.path.expanduser('~/the108fbo/public'))) \
            else os.path.expanduser('~/the108fbo/public/data.json')
 
