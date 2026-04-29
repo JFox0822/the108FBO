@@ -184,7 +184,7 @@ def get_period_stats(period):
         {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'},
     ]:
         raw = get('/fxea/general/getStandings', params)
-        if not raw or list(raw.keys()) == ['error']: continue
+        if not raw or (isinstance(raw, dict) and list(raw.keys()) == ['error']): continue
         rows = raw if isinstance(raw, list) else raw.get('standings', raw.get('teams', []))
         if isinstance(rows, dict): rows = list(rows.values())
         if not rows: continue
@@ -201,8 +201,8 @@ def get_period_stats(period):
     if period == 4:
         # Debug: show what we DO get for period 4
         raw = get('/fxea/general/getStandings', {'season': 2026})
-        print(f'  Regular getStandings keys: {list(raw.keys())[:10] if raw else "empty"}')
-        rows = raw if isinstance(raw, list) else raw.get('standings', [])
+        print(f'  Regular getStandings type: {type(raw).__name__}')
+        rows = raw if isinstance(raw, list) else raw.get('standings', []) if isinstance(raw, dict) else []
         if isinstance(rows, dict): rows = list(rows.values())
         if rows:
             print(f'  Regular row keys: {list(rows[0].keys())}')
