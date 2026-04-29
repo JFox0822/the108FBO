@@ -126,8 +126,8 @@ if not test or list(test.keys()) == ['error']:
 print(f'Auth test: {list(test.keys())[:6] if test else "failed"}')
 
 # ── USE FANTRAXAPI LIBRARY FOR SCORES ────────────
-print('Fetching scores via fantraxapi library...')
-scores_filled = 0
+print('Capturing score data via fantraxapi library...')
+_table_data = None
 try:
     from fantraxapi import League
     from fantraxapi import api as fxapi
@@ -148,102 +148,13 @@ try:
     except: pass
     fxapi.request = original_request
 
-    table_data = next((r for r in captured_raw if isinstance(r, dict) and 'tableList' in r), None)
-    if not table_data:
-        print('  No tableList found')
+    _table_data = next((r for r in captured_raw if isinstance(r, dict) and 'tableList' in r), None)
+    if _table_data:
+        print(f'  ✅ Got tableList with {len(_table_data["tableList"])} periods')
     else:
-        table_list   = table_data['tableList']
-        fantasy_info = table_data.get('fantasyTeamInfo', {})
-
-        # Build teamId lookup from fantasyTeamInfo
-        # fantasyTeamInfo maps teamId -> {name, ...}
-        print(f'  fantasyTeamInfo sample: {json.dumps(dict(list(fantasy_info.items())[:2]))[:300]}')
-
-        for table in table_list:
-            caption = table.get('caption', '')  # e.g. "Scoring Period 1"
-            # Extract period number from caption
-            import re as _re
-            m = _re.search(r'Scoring Period (\d+)', caption)
-            if not m: continue
-            period = int(m.group(1))
-
-            wk = next((w for w in schedule if w['period'] == period), None)
-            if not wk: continue
-
-            rows = table.get('rows', [])
-            fixed_rows = table.get('fixedRows', {})
-            if not isinstance(fixed_rows, dict):
-                fixed_rows = {}
-
-            # Header order: W,L,T,Pts,R,HR,RBI,SO,SB,AVG,OPS,IP,QS,H,K,ERA,WHIP,SVH
-            header = [c.get('shortName', '') for c in table.get('header', {}).get('cells', [])]
-            cat_keys = header[4:]  # skip W,L,T,Pts
-
-            # Fixed rows has team info keyed by row index
-            # rows come in pairs: away (even) then home (odd)
-            for i in range(0, len(rows) - 1, 2):
-                away_row = rows[i]
-                home_row = rows[i + 1]
-
-                # Get team IDs from fixedRows
-                away_fixed = fixed_rows.get(str(i), fixed_rows.get(i, {}))
-                home_fixed = fixed_rows.get(str(i+1), fixed_rows.get(i+1, {}))
-
-                away_tid = (away_fixed.get('cells', [{}])[0].get('teamId', '') if isinstance(away_fixed, dict)
-                            else '')
-                home_tid = (home_fixed.get('cells', [{}])[0].get('teamId', '') if isinstance(home_fixed, dict)
-                            else '')
-
-                def parse_cells(row_data):
-                    cells = row_data.get('cells', [])
-                    vals = [c.get('toolTip', c.get('content', '')) for c in cells]
-                    return vals
-
-                away_vals = parse_cells(away_row)
-                home_vals = parse_cells(home_row)
-
-                # W,L,T,Pts = first 4
-                away_score = float(away_vals[3]) if len(away_vals) > 3 else None
-                home_score = float(home_vals[3]) if len(home_vals) > 3 else None
-
-                # Categories
-                cats = {}
-                for j, cat in enumerate(cat_keys):
-                    idx = j + 4
-                    av = away_vals[idx] if idx < len(away_vals) else None
-                    hv = home_vals[idx] if idx < len(home_vals) else None
-                    try: av = float(av)
-                    except: pass
-                    try: hv = float(hv)
-                    except: pass
-                    cats[cat] = {'away': av, 'home': hv}
-
-                # Match to schedule matchup
-                matched = False
-                for mm in wk['matchupList']:
-                    aid, hid = mm['away']['id'], mm['home']['id']
-                    # Try by team ID from fixedRows
-                    if away_tid and home_tid:
-                        if aid == away_tid and hid == home_tid:
-                            matched = True
-                    # Fallback: match by position if only 2 rows (1 matchup per table view)
-                    if not matched and len(rows) == 2 and i == 0:
-                        matched = True
-                    if matched:
-                        mm['awayScore'] = away_score
-                        mm['homeScore'] = home_score
-                        mm['categories'] = cats
-                        scores_filled += 1
-                        if period == 1:
-                            print(f'  P1 matchup: {mm["away"]["name"]} {away_score} vs {mm["home"]["name"]} {home_score}')
-                            print(f'  cats sample: R={cats.get("R")}, HR={cats.get("HR")}, ERA={cats.get("ERA")}')
-                        break
-
-        print(f'  ✅ {scores_filled} matchups parsed from tableList')
-
+        print('  No tableList found')
 except Exception as e:
-    print(f'  Error: {e}')
-    import traceback; traceback.print_exc()
+    print(f'  Capture error: {e}')
 
 # ── PLAYER ADP ────────────────────────────────────
 print('Fetching player ADP...')
@@ -332,47 +243,74 @@ print(f'  {len(schedule)} weeks')
 # ── SCORES & CATEGORIES ───────────────────────────
 print('Fetching scores...')
 scores_filled = 0
-for wk in schedule:
-    period = wk['period']
-    for ep, params in [
-        ('/fxea/general/getScoreboard',      {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
-        ('/fxea/general/getScoreboard',      {'period': period}),
-        ('/fxea/general/getMatchupResults',  {'scoringPeriod': period}),
-        ('/fxea/general/getTeamMatchupInfo', {'scoringPeriod': period}),
-        ('/fxea/general/getLiveScoring',     {'scoringPeriod': period}),
-    ]:
-        raw = get(ep, params)
-        if not raw or (isinstance(raw, dict) and list(raw.keys()) == ['error']): continue
-        rows = raw if isinstance(raw, list) else raw.get('matchupList', raw.get('matchups', []))
-        if not rows: continue
-        if period <= 2:
-            print(f'  Period {period} hit via {ep}: keys={list(rows[0].keys())[:10] if rows and isinstance(rows[0],dict) else "?"}')
-            if rows and isinstance(rows[0], dict):
-                print(f'  sample: {json.dumps(rows[0])[:400]}')
-        found = False
-        for row in rows:
-            if not isinstance(row, dict): continue
-            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id',''))
-            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id',''))
-            if not aid or not hid: continue
-            for m in wk['matchupList']:
-                if m['away']['id'] == aid and m['home']['id'] == hid:
-                    away_obj = row.get('away', {}) or {}
-                    home_obj  = row.get('home', {}) or {}
-                    away_s = (row.get('awayScore') or row.get('awayCatWins') or
-                              away_obj.get('score') or away_obj.get('catWins'))
-                    home_s = (row.get('homeScore') or row.get('homeCatWins') or
-                              home_obj.get('score') or home_obj.get('catWins'))
-                    if away_s is not None: m['awayScore'] = away_s
-                    if home_s is not None: m['homeScore'] = home_s
-                    a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
-                    h_stats  = home_obj.get('stats') or home_obj.get('categoryStats') or {}
-                    if a_stats or h_stats:
-                        m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
-                                           for k in set(list(a_stats)+list(h_stats))}
-                        scores_filled += 1
-                    found = True; break
-        if found: break
+import re as _re
+
+# Parse scores from captured tableList
+if _table_data:
+    table_list = _table_data['tableList']
+    for table in table_list:
+        caption = table.get('caption', '')
+        pm = _re.search(r'Scoring Period (\d+)', caption)
+        if not pm: continue
+        period = int(pm.group(1))
+        wk = next((w for w in schedule if w['period'] == period), None)
+        if not wk: continue
+
+        rows = table.get('rows', [])
+        fixed_rows = table.get('fixedRows', {})
+        if not isinstance(fixed_rows, dict): fixed_rows = {}
+        header = [c.get('shortName','') for c in table.get('header',{}).get('cells',[])]
+        cat_keys = header[4:]  # skip W,L,T,Pts
+
+        def parse_vals(row_data):
+            cells = row_data.get('cells', [])
+            return [c.get('toolTip', c.get('content','')) for c in cells]
+
+        # 12 rows per table = 6 matchups × 2 teams (away then home)
+        for i in range(0, len(rows)-1, 2):
+            away_vals = parse_vals(rows[i])
+            home_vals = parse_vals(rows[i+1])
+
+            # Get team IDs from fixedRows
+            af = fixed_rows.get(str(i), fixed_rows.get(i, {}))
+            hf = fixed_rows.get(str(i+1), fixed_rows.get(i+1, {}))
+            away_tid = af.get('cells',[{}])[0].get('teamId','') if isinstance(af,dict) and af.get('cells') else ''
+            home_tid  = hf.get('cells',[{}])[0].get('teamId','') if isinstance(hf,dict) and hf.get('cells') else ''
+
+            try: away_score = float(away_vals[3])
+            except: away_score = None
+            try: home_score = float(home_vals[3])
+            except: home_score = None
+
+            cats = {}
+            for j, cat in enumerate(cat_keys):
+                idx = j + 4
+                av = away_vals[idx] if idx < len(away_vals) else None
+                hv = home_vals[idx] if idx < len(home_vals) else None
+                try: av = float(av)
+                except: pass
+                try: hv = float(hv)
+                except: pass
+                cats[cat] = {'away': av, 'home': hv}
+
+            # Match to schedule
+            for mm in wk['matchupList']:
+                aid, hid = mm['away']['id'], mm['home']['id']
+                match = (away_tid and home_tid and aid == away_tid and hid == home_tid)
+                if not match:
+                    # Fallback: position-based (row pair index → matchup index)
+                    mi = i // 2
+                    if mi < len(wk['matchupList']) and mm is wk['matchupList'][mi]:
+                        match = True
+                if match:
+                    mm['awayScore'] = away_score
+                    mm['homeScore'] = home_score
+                    mm['categories'] = cats
+                    scores_filled += 1
+                    if period == 1 and i == 0:
+                        print(f'  P1 sample: {mm["away"]["name"]} {away_score} vs {mm["home"]["name"]} {home_score}')
+                        print(f'  R={cats.get("R")}, HR={cats.get("HR")}, ERA={cats.get("ERA")}, WHIP={cats.get("WHIP")}')
+                    break
 print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
 
 # ── STANDINGS ─────────────────────────────────────
