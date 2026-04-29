@@ -128,40 +128,53 @@ print(f'Auth test: {list(test.keys())[:6] if test else "failed"}')
 # ── USE FANTRAXAPI LIBRARY FOR SCORES ────────────
 print('Fetching scores via fantraxapi library...')
 try:
-    import pickle, os
-    from requests import Session as RSession
     from fantraxapi import League
+    from fantraxapi import api as fxapi
 
-    # Load our Selenium cookies into a requests Session for fantraxapi
-    fan_session = RSession()
+    fan_session = __import__('requests').Session()
     for name, value in s.cookies.items():
         fan_session.cookies.set(name, value, domain='.fantrax.com')
 
-    league = League(LID, session=fan_session)
-    results = league.scoring_period_results()
-    print(f'  Got {len(results)} scoring period results')
+    # Monkey-patch to capture raw API calls
+    original_request = fxapi.request
+    captured_calls = []
+    def capturing_request(league, methods):
+        result = original_request(league, methods)
+        captured_calls.append({'methods': str(methods)[:100], 'result_keys': list(result.keys())[:10] if isinstance(result, dict) else type(result).__name__})
+        return result
+    fxapi.request = capturing_request
 
-    for period_num, result in results.items():
-        wk = next((w for w in schedule if w['period'] == period_num), None)
-        if not wk: continue
-        for key, matchup in result.matchups.items() if hasattr(result, 'matchups') else []:
-            # Find matching matchup in schedule
-            for m in wk['matchupList']:
-                away_id = m['away']['id']
-                home_id = m['home']['id']
-                # Try to match by team id
-                if hasattr(matchup, 'away_record') and hasattr(matchup, 'home_record'):
-                    try:
-                        a_score = matchup.away_record.wins if hasattr(matchup.away_record, 'wins') else None
-                        h_score = matchup.home_record.wins if hasattr(matchup.home_record, 'wins') else None
-                        if a_score is not None:
-                            m['awayScore'] = a_score
-                            m['homeScore'] = h_score
-                    except: pass
-        print(f'  Period {period_num}: {result}')
+    league = League(LID, session=fan_session)
+
+    # Try to get raw data before it crashes
+    try:
+        results = league.scoring_period_results()
+        print(f'  Got {len(results)} scoring periods')
+    except Exception as e:
+        print(f'  Parse error (expected): {e}')
+
+    print(f'  Captured {len(captured_calls)} API calls:')
+    for call in captured_calls:
+        print(f'    methods={call["methods"]} → keys={call["result_keys"]}')
+
+    fxapi.request = original_request
+
+    # Now try to get the raw data directly using what the library calls
+    # The library likely calls something like 'getStandings' with specific methods
+    # Let's try to call it ourselves with full debug
+    from fantraxapi.api import Method
+    # Common methods used by scoring_period_results
+    for method_name in ['getStandings', 'getLeagueStandings', 'getMatchupResults',
+                        'getScoringPeriods', 'getH2HResults', 'getScoreSummary']:
+        try:
+            m = Method[method_name] if hasattr(Method, method_name) else None
+            if m:
+                raw = fxapi.request(league, m)
+                print(f'  Method.{method_name}: {list(raw.keys())[:8] if isinstance(raw, dict) else type(raw).__name__}')
+        except: pass
 
 except Exception as e:
-    print(f'  fantraxapi error: {e}')
+    print(f'  Error: {e}')
     import traceback; traceback.print_exc()
 
 # ── PLAYER ADP ────────────────────────────────────
