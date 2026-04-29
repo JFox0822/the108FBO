@@ -127,6 +127,7 @@ print(f'Auth test: {list(test.keys())[:6] if test else "failed"}')
 
 # ── USE FANTRAXAPI LIBRARY FOR SCORES ────────────
 print('Fetching scores via fantraxapi library...')
+scores_filled = 0
 try:
     from fantraxapi import League
     from fantraxapi import api as fxapi
@@ -144,31 +145,40 @@ try:
     fxapi.request = capturing_request
 
     league = League(LID, session=fan_session)
-    try:
-        league.scoring_period_results()
+    try: league.scoring_period_results()
     except: pass
-
     fxapi.request = original_request
 
-    # The second call has tableList — dig into it
-    for i, raw in enumerate(captured_raw):
-        print(f'\nCall {i+1} keys: {list(raw.keys())[:12] if isinstance(raw, dict) else type(raw).__name__}')
+    # Find the response with tableList
+    table_data = None
+    for raw in captured_raw:
         if isinstance(raw, dict) and 'tableList' in raw:
-            tl = raw['tableList']
-            print(f'  tableList type: {type(tl).__name__}, len: {len(tl) if isinstance(tl, (list,dict)) else "?"}')
-            if isinstance(tl, list) and tl:
-                print(f'  tableList[0] keys: {list(tl[0].keys())[:15] if isinstance(tl[0], dict) else tl[0]}')
-                print(f'  tableList[0]: {json.dumps(tl[0])[:800]}')
-            elif isinstance(tl, dict):
-                print(f'  tableList keys: {list(tl.keys())[:10]}')
-                first_val = next(iter(tl.values()))
-                print(f'  first val: {json.dumps(first_val)[:800]}')
-        if isinstance(raw, dict) and 'matchupIdsPerTeam' in raw:
-            print(f'  matchupIdsPerTeam: {json.dumps(raw["matchupIdsPerTeam"])[:300]}')
-        if isinstance(raw, dict) and 'displayedLists' in raw:
-            dl = raw['displayedLists']
-            print(f'  displayedLists type={type(dl).__name__}')
-            print(f'  displayedLists: {json.dumps(dl)[:400]}')
+            table_data = raw
+            break
+
+    if not table_data:
+        print('  No tableList found')
+    else:
+        table_list = table_data['tableList']
+        print(f'  Found {len(table_list)} scoring period tables')
+
+        # Print first table's rows to understand structure
+        if table_list:
+            t0 = table_list[0]
+            print(f'  Period 1 caption: {t0.get("caption")}')
+            rows = t0.get('rows', [])
+            print(f'  Period 1 rows: {len(rows)}')
+            if rows:
+                print(f'  Row 0: {json.dumps(rows[0])[:600]}')
+            if len(rows) > 1:
+                print(f'  Row 1: {json.dumps(rows[1])[:600]}')
+
+        # Build header key list from first table
+        t0 = table_list[0]
+        header_cells = t0.get('header', {}).get('cells', [])
+        fixed_cells  = t0.get('fixedHeader', {}).get('cells', [])
+        print(f'  Header keys: {[c.get("shortName","?") for c in header_cells[:20]]}')
+        print(f'  Fixed keys:  {[c.get("key","?") for c in fixed_cells]}')
 
 except Exception as e:
     print(f'  Error: {e}')
