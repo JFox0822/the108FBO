@@ -165,66 +165,92 @@ player_map_out = {pid: {'name': p.get('name',''), 'pos': p.get('pos','?'), 'adp'
                   for pid, p in player_map.items()}
 named = sum(1 for p in player_map_out.values() if p['name'] and not p['name'].startswith('ID:'))
 
-# ── PART 2: Playwright headless browser for scores ──────────────────────────
-print('Fetching scores via headless browser...')
-
-async def fetch_scores_playwright():
-    return []
-
-captured = []
-
-# ── FETCH SCORES: try getTeamStats per period ────
-print('Fetching scores via HTML scrape of standings results page...')
+# ── SCORES: get per-period team stats from getStandings ──────────────────────
+# Strategy: getStandings with scoringPeriod=N returns each team's stats for that period.
+# Compare matched-up teams' stats to determine category winners and overall H2H score.
+print('Fetching per-period team stats...')
 scores_filled = 0
 
-try:
-    from html.parser import HTMLParser
+# Probe period 4 first to find the right params
+period_stats_cache = {}  # period -> {teamId -> {stat: value}}
 
-    # Fetch the public standings results page
-    url = f'{BASE}/fantasy/league/{LID}/standings;view=SCHEDULE'
-    r = s.get(url, timeout=30, headers={
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    })
-    print(f'  Standings page: HTTP {r.status_code}, {len(r.text)} chars')
+def get_period_stats(period):
+    if period in period_stats_cache:
+        return period_stats_cache[period]
+    for params in [
+        {'scoringPeriod': period, 'season': 2026},
+        {'scoringPeriod': period},
+        {'period': period, 'season': 2026},
+        {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'},
+    ]:
+        raw = get('/fxea/general/getStandings', params)
+        if not raw or list(raw.keys()) == ['error']: continue
+        rows = raw if isinstance(raw, list) else raw.get('standings', raw.get('teams', []))
+        if isinstance(rows, dict): rows = list(rows.values())
+        if not rows: continue
+        sample = rows[0]
+        # Check if this period-specific (has category stats beyond just W-L-T)
+        has_cats = any(k in sample for k in ['R','HR','RBI','ERA','WHIP','IP','AVG','OPS'])
+        if has_cats:
+            result = {row.get('teamId',''): row for row in rows if isinstance(row, dict)}
+            period_stats_cache[period] = result
+            if period == 4:
+                print(f'  ✅ Period 4 stats found! keys: {list(sample.keys())[:15]}')
+                print(f'  Sample: {json.dumps(sample)[:400]}')
+            return result
+    if period == 4:
+        # Debug: show what we DO get for period 4
+        raw = get('/fxea/general/getStandings', {'season': 2026})
+        print(f'  Regular getStandings keys: {list(raw.keys())[:10] if raw else "empty"}')
+        rows = raw if isinstance(raw, list) else raw.get('standings', [])
+        if isinstance(rows, dict): rows = list(rows.values())
+        if rows:
+            print(f'  Regular row keys: {list(rows[0].keys())}')
+            print(f'  Regular sample: {json.dumps(rows[0])[:400]}')
+    return {}
 
-    if r.status_code == 200:
-        import re
-        html = r.text
+# SCORING CATEGORIES — lower is better for SO(bat), H(pit), ERA, WHIP
+CAT_LOWER = {'SO', 'H', 'ERA', 'WHIP'}
+ALL_CATS = ['R','HR','RBI','SO','SB','AVG','OPS','IP','H','K','QS','ERA','WHIP','SVH']
 
-        # Look for JSON data embedded in script tags
-        # Fantrax often embeds data as window.__INITIAL_STATE__ or similar
-        json_patterns = [
-            r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
-            r'window\.__data__\s*=\s*({.*?});',
-            r'"standings"\s*:\s*(\[.*?\])',
-            r'"scoringPeriods"\s*:\s*(\[.*?\])',
-            r'"periods"\s*:\s*(\[.*?\])',
-            r'ng-init="[^"]*({[^"]*scoringPeriod[^"]*})',
-        ]
-        for pattern in json_patterns:
-            m = re.search(pattern, html, re.DOTALL)
-            if m:
-                print(f'  Found JSON pattern: {pattern[:40]}')
-                print(f'  Data: {m.group(1)[:400]}')
-
-        # Check if data is in the HTML itself (server-rendered table)
-        if 'Scoring Period' in html:
-            print('  ✅ Found "Scoring Period" in HTML — server-rendered data present')
-            # Show context around it
-            idx = html.find('Scoring Period')
-            print(f'  Context: {html[idx:idx+500]}')
-        else:
-            print('  No "Scoring Period" found — page may require JS')
-
-        # Print first 2000 chars of body to understand structure
-        body_start = html.find('<body')
-        print(f'  Body preview: {html[body_start:body_start+1000]}')
-
-except Exception as e:
-    print(f'  Scrape error: {e}')
+for wk in schedule:
+    period = wk['period']
+    team_stats = get_period_stats(period)
+    if not team_stats:
+        continue
+    for m in wk['matchupList']:
+        a_row = team_stats.get(m['away']['id'], {})
+        h_row = team_stats.get(m['home']['id'], {})
+        if not a_row or not h_row:
+            continue
+        # Calculate category wins
+        a_wins = h_wins = ties = 0
+        cats = {}
+        for cat in ALL_CATS:
+            av = a_row.get(cat)
+            hv = h_row.get(cat)
+            if av is None or hv is None:
+                continue
+            try:
+                av_f, hv_f = float(av), float(hv)
+            except:
+                continue
+            cats[cat] = {'away': av_f, 'home': hv_f}
+            lower_better = cat in CAT_LOWER
+            if av_f == hv_f:
+                ties += 1
+            elif (lower_better and av_f < hv_f) or (not lower_better and av_f > hv_f):
+                a_wins += 1
+            else:
+                h_wins += 1
+        if a_wins + h_wins + ties > 0:
+            m['awayScore'] = a_wins
+            m['homeScore'] = h_wins
+            m['categories'] = cats
+            scores_filled += 1
 
 print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
+
 
 # ── OUTPUT ───────────────────────────────────────────────────────────────────
 out_path = 'data.json' if (os.path.isdir('.git') or not os.path.exists(os.path.expanduser('~/the108fbo/public'))) \
