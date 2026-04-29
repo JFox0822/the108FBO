@@ -174,54 +174,55 @@ async def fetch_scores_playwright():
 captured = []
 
 # ── FETCH SCORES: try getTeamStats per period ────
-print('Fetching scores...')
+print('Fetching scores via HTML scrape of standings results page...')
 scores_filled = 0
 
-for wk in schedule:
-    period = wk['period']
-    for ep, params in [
-        ('/fxea/general/getTeamStats', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD', 'teamId': 'ALL'}),
-        ('/fxea/general/getTeamStats', {'period': period, 'timeframeType': 'BY_PERIOD'}),
-        ('/fxea/general/getTeamStats', {'scoringPeriod': period, 'statsType': 'STATS'}),
-        ('/fxea/general/getScoreboard', {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'}),
-        ('/fxea/general/getScoreboard', {'period': period}),
-    ]:
-        raw = get(ep, params)
-        if not raw or list(raw.keys()) == ['error']: continue
-        # Log what we get for period 4 (known to have scores)
-        if period == 4:
-            print(f'  Period 4 hit: {ep} → keys: {list(raw.keys())[:10]}')
-            print(f'  Sample: {json.dumps(raw)[:400]}')
-        rows = raw if isinstance(raw, list) else raw.get(
-            'matchupList', raw.get('matchups', raw.get('teamStatsList', raw.get('stats', []))))
-        if not rows: continue
-        found_any = False
-        for row in rows:
-            if not isinstance(row, dict): continue
-            aid = (row.get('awayTeamId') or (row.get('away') or {}).get('id', ''))
-            hid = (row.get('homeTeamId') or (row.get('home') or {}).get('id', ''))
-            if not aid or not hid: continue
-            for m in wk['matchupList']:
-                if m['away']['id'] == aid and m['home']['id'] == hid:
-                    away_obj = row.get('away', {}) or {}
-                    home_obj = row.get('home', {}) or {}
-                    away_s = (row.get('awayScore') or row.get('awayCatWins') or
-                              away_obj.get('score') or away_obj.get('catWins'))
-                    home_s = (row.get('homeScore') or row.get('homeCatWins') or
-                              home_obj.get('score') or home_obj.get('catWins'))
-                    if away_s is not None or home_s is not None:
-                        m['awayScore'] = away_s
-                        m['homeScore'] = home_s
-                        scores_filled += 1
-                        found_any = True
-                    a_stats = away_obj.get('stats') or away_obj.get('categoryStats') or {}
-                    h_stats = home_obj.get('stats') or home_obj.get('categoryStats') or {}
-                    if a_stats or h_stats:
-                        m['categories'] = {k: {'away': a_stats.get(k), 'home': h_stats.get(k)}
-                                           for k in set(list(a_stats.keys()) + list(h_stats.keys()))}
-                    break
-        if found_any:
-            break
+try:
+    from html.parser import HTMLParser
+
+    # Fetch the public standings results page
+    url = f'{BASE}/fantasy/league/{LID}/standings;view=SCHEDULE'
+    r = s.get(url, timeout=30, headers={
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    })
+    print(f'  Standings page: HTTP {r.status_code}, {len(r.text)} chars')
+
+    if r.status_code == 200:
+        import re
+        html = r.text
+
+        # Look for JSON data embedded in script tags
+        # Fantrax often embeds data as window.__INITIAL_STATE__ or similar
+        json_patterns = [
+            r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
+            r'window\.__data__\s*=\s*({.*?});',
+            r'"standings"\s*:\s*(\[.*?\])',
+            r'"scoringPeriods"\s*:\s*(\[.*?\])',
+            r'"periods"\s*:\s*(\[.*?\])',
+            r'ng-init="[^"]*({[^"]*scoringPeriod[^"]*})',
+        ]
+        for pattern in json_patterns:
+            m = re.search(pattern, html, re.DOTALL)
+            if m:
+                print(f'  Found JSON pattern: {pattern[:40]}')
+                print(f'  Data: {m.group(1)[:400]}')
+
+        # Check if data is in the HTML itself (server-rendered table)
+        if 'Scoring Period' in html:
+            print('  ✅ Found "Scoring Period" in HTML — server-rendered data present')
+            # Show context around it
+            idx = html.find('Scoring Period')
+            print(f'  Context: {html[idx:idx+500]}')
+        else:
+            print('  No "Scoring Period" found — page may require JS')
+
+        # Print first 2000 chars of body to understand structure
+        body_start = html.find('<body')
+        print(f'  Body preview: {html[body_start:body_start+1000]}')
+
+except Exception as e:
+    print(f'  Scrape error: {e}')
 
 print(f'  {len(schedule)} weeks · {scores_filled} scores filled')
 
