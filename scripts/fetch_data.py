@@ -124,19 +124,45 @@ if not test or list(test.keys()) == ['error']:
     test = get('/fxea/general/getScoreboard', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'})
 
 print(f'Auth test: {list(test.keys())[:6] if test else "failed"}')
-if test and list(test.keys()) != ['error']:
-    print(f'  ✅ Authenticated! Sample: {json.dumps(test)[:300]}')
-else:
-    print(f'  ❌ Auth error details: {json.dumps(test)[:400]}')
-    # Try other endpoints to see what works
-    for ep, params in [
-        ('/fxea/general/getScoreboard', {'scoringPeriod': 1}),
-        ('/fxea/general/getMatchupResults', {'scoringPeriod': 1}),
-        ('/fxea/general/getTeamMatchupInfo', {'scoringPeriod': 1}),
-        ('/fxea/general/getStandings', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'}),
-    ]:
-        r2 = get(ep, params)
-        print(f'  {ep.split("/")[-1]}: {json.dumps(r2)[:200]}')
+
+# ── USE FANTRAXAPI LIBRARY FOR SCORES ────────────
+print('Fetching scores via fantraxapi library...')
+try:
+    import pickle, os
+    from requests import Session as RSession
+    from fantraxapi import League
+
+    # Load our Selenium cookies into a requests Session for fantraxapi
+    fan_session = RSession()
+    for name, value in s.cookies.items():
+        fan_session.cookies.set(name, value, domain='.fantrax.com')
+
+    league = League(LID, session=fan_session)
+    results = league.scoring_period_results()
+    print(f'  Got {len(results)} scoring period results')
+
+    for period_num, result in results.items():
+        wk = next((w for w in schedule if w['period'] == period_num), None)
+        if not wk: continue
+        for key, matchup in result.matchups.items() if hasattr(result, 'matchups') else []:
+            # Find matching matchup in schedule
+            for m in wk['matchupList']:
+                away_id = m['away']['id']
+                home_id = m['home']['id']
+                # Try to match by team id
+                if hasattr(matchup, 'away_record') and hasattr(matchup, 'home_record'):
+                    try:
+                        a_score = matchup.away_record.wins if hasattr(matchup.away_record, 'wins') else None
+                        h_score = matchup.home_record.wins if hasattr(matchup.home_record, 'wins') else None
+                        if a_score is not None:
+                            m['awayScore'] = a_score
+                            m['homeScore'] = h_score
+                    except: pass
+        print(f'  Period {period_num}: {result}')
+
+except Exception as e:
+    print(f'  fantraxapi error: {e}')
+    import traceback; traceback.print_exc()
 
 # ── PLAYER ADP ────────────────────────────────────
 print('Fetching player ADP...')
