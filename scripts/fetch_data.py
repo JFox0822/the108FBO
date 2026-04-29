@@ -189,7 +189,6 @@ def get_period_stats(period):
         if isinstance(rows, dict): rows = list(rows.values())
         if not rows: continue
         sample = rows[0]
-        # Check if this period-specific (has category stats beyond just W-L-T)
         has_cats = any(k in sample for k in ['R','HR','RBI','ERA','WHIP','IP','AVG','OPS'])
         if has_cats:
             result = {row.get('teamId',''): row for row in rows if isinstance(row, dict)}
@@ -197,6 +196,37 @@ def get_period_stats(period):
             if period == 4:
                 print(f'  ✅ Period 4 stats found! keys: {list(sample.keys())[:15]}')
                 print(f'  Sample: {json.dumps(sample)[:400]}')
+            return result
+
+    # Fallback: try getTeamRosters with scoringPeriod to get player-level stats
+    for params in [
+        {'scoringPeriod': period, 'timeframeType': 'BY_PERIOD'},
+        {'scoringPeriod': period},
+    ]:
+        raw = get('/fxea/general/getTeamRosters', params)
+        if not raw or (isinstance(raw, dict) and list(raw.keys()) == ['error']): continue
+        rosters_data = raw.get('rosters', {})
+        if not rosters_data: continue
+        # Check if players have stats
+        sample_team = next(iter(rosters_data.values()), {})
+        sample_player = next(iter(sample_team.get('rosterItems', [])), {})
+        if period == 4:
+            print(f'  Roster player keys: {list(sample_player.keys())[:15]}')
+            print(f'  Roster player: {json.dumps(sample_player)[:300]}')
+        has_stats = any(k in sample_player for k in ['R','HR','RBI','ERA','stats','categoryStats'])
+        if has_stats:
+            # Aggregate player stats to team level
+            result = {}
+            for tid, tdata in rosters_data.items():
+                team_agg = {c: 0.0 for c in ALL_CATS}
+                for player in tdata.get('rosterItems', []):
+                    for cat in ALL_CATS:
+                        v = player.get(cat) or (player.get('stats') or {}).get(cat)
+                        if v is not None:
+                            try: team_agg[cat] += float(v)
+                            except: pass
+                result[tid] = team_agg
+            period_stats_cache[period] = result
             return result
     if period == 4:
         # Debug: show what we DO get for period 4
