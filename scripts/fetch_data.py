@@ -135,43 +135,40 @@ try:
     for name, value in s.cookies.items():
         fan_session.cookies.set(name, value, domain='.fantrax.com')
 
-    # Monkey-patch to capture raw API calls
     original_request = fxapi.request
-    captured_calls = []
+    captured_raw = []
     def capturing_request(league, methods):
         result = original_request(league, methods)
-        captured_calls.append({'methods': str(methods)[:100], 'result_keys': list(result.keys())[:10] if isinstance(result, dict) else type(result).__name__})
+        captured_raw.append(result)
         return result
     fxapi.request = capturing_request
 
     league = League(LID, session=fan_session)
-
-    # Try to get raw data before it crashes
     try:
-        results = league.scoring_period_results()
-        print(f'  Got {len(results)} scoring periods')
-    except Exception as e:
-        print(f'  Parse error (expected): {e}')
-
-    print(f'  Captured {len(captured_calls)} API calls:')
-    for call in captured_calls:
-        print(f'    methods={call["methods"]} → keys={call["result_keys"]}')
+        league.scoring_period_results()
+    except: pass
 
     fxapi.request = original_request
 
-    # Now try to get the raw data directly using what the library calls
-    # The library likely calls something like 'getStandings' with specific methods
-    # Let's try to call it ourselves with full debug
-    from fantraxapi.api import Method
-    # Common methods used by scoring_period_results
-    for method_name in ['getStandings', 'getLeagueStandings', 'getMatchupResults',
-                        'getScoringPeriods', 'getH2HResults', 'getScoreSummary']:
-        try:
-            m = Method[method_name] if hasattr(Method, method_name) else None
-            if m:
-                raw = fxapi.request(league, m)
-                print(f'  Method.{method_name}: {list(raw.keys())[:8] if isinstance(raw, dict) else type(raw).__name__}')
-        except: pass
+    # The second call has tableList — dig into it
+    for i, raw in enumerate(captured_raw):
+        print(f'\nCall {i+1} keys: {list(raw.keys())[:12] if isinstance(raw, dict) else type(raw).__name__}')
+        if isinstance(raw, dict) and 'tableList' in raw:
+            tl = raw['tableList']
+            print(f'  tableList type: {type(tl).__name__}, len: {len(tl) if isinstance(tl, (list,dict)) else "?"}')
+            if isinstance(tl, list) and tl:
+                print(f'  tableList[0] keys: {list(tl[0].keys())[:15] if isinstance(tl[0], dict) else tl[0]}')
+                print(f'  tableList[0]: {json.dumps(tl[0])[:800]}')
+            elif isinstance(tl, dict):
+                print(f'  tableList keys: {list(tl.keys())[:10]}')
+                first_val = next(iter(tl.values()))
+                print(f'  first val: {json.dumps(first_val)[:800]}')
+        if isinstance(raw, dict) and 'matchupIdsPerTeam' in raw:
+            print(f'  matchupIdsPerTeam: {json.dumps(raw["matchupIdsPerTeam"])[:300]}')
+        if isinstance(raw, dict) and 'displayedLists' in raw:
+            dl = raw['displayedLists']
+            print(f'  displayedLists type={type(dl).__name__}')
+            print(f'  displayedLists: {json.dumps(dl)[:400]}')
 
 except Exception as e:
     print(f'  Error: {e}')
