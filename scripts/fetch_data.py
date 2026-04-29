@@ -174,28 +174,16 @@ period_stats_cache = {}
 
 # Targeted probe for period 1 — try every plausible endpoint/param combo
 print('Probing for period 1 results...')
+RHINO_ID = 'tbwrxqepmg6kvw0l'
 for ep, params in [
-    # getLeagueInfo with scoringPeriod might return scores embedded
-    ('/fxea/general/getLeagueInfo', {'scoringPeriod': 1}),
-    ('/fxea/general/getLeagueInfo', {'period': 1}),
-    # getStandings variants
-    ('/fxea/general/getStandings', {'scoringPeriod': 1}),
-    ('/fxea/general/getStandings', {'scoringPeriod': 1, 'season': 2026}),
-    # Roster with period — might have player stats
-    ('/fxea/general/getTeamRosters', {'scoringPeriod': 1}),
-    ('/fxea/general/getTeamRosters', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'}),
-    # Other potential endpoints
-    ('/fxea/general/getMatchupScorecard', {'scoringPeriod': 1}),
-    ('/fxea/general/getScorecardInfo', {'scoringPeriod': 1}),
-    ('/fxea/general/getMatchupSummary', {'scoringPeriod': 1}),
-    ('/fxea/general/getTeamMatchupHistory', {'scoringPeriod': 1}),
-    ('/fxea/general/getLeagueHistory', {'scoringPeriod': 1}),
-    ('/fxea/general/getH2HResults', {'scoringPeriod': 1}),
-    ('/fxea/general/getMatchupDetail', {'scoringPeriod': 1}),
-    ('/fxea/general/getWeeklyResults', {'scoringPeriod': 1}),
-    ('/fxea/general/getScoringPeriodInfo', {'scoringPeriod': 1}),
-    ('/fxea/general/getBoxScore', {'scoringPeriod': 1}),
-    ('/fxea/general/getMatchupBoxScore', {'scoringPeriod': 1}),
+    ('/fxea/general/getStandings', {'teamId': RHINO_ID}),
+    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'season': 2026}),
+    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'view': 'SCHEDULE'}),
+    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'view': 'SCHEDULE', 'season': 2026}),
+    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'timeframeType': 'BY_PERIOD'}),
+    ('/fxea/general/getStandings', {'teamId': RHINO_ID, 'type': 'SCHEDULE'}),
+    ('/fxea/general/getLeagueInfo',  {'teamId': RHINO_ID}),
+    ('/fxea/general/getMatchups',    {'teamId': RHINO_ID, 'season': 2026}),
 ]:
     raw = get(ep, params)
     if not raw: continue
