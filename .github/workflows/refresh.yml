@@ -15,7 +15,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests selenium webdriver-manager
+        run: pip install requests selenium webdriver-manager fantraxapi
 
       - name: Run fetch script
         env:
