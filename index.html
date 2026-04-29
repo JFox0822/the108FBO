@@ -2282,7 +2282,9 @@ function renderCards(week, period, weekDates, catLookup) {
       ${HIT_CATS.map(c => buildCatRow(c, aStats, hStats)).join('')}
       <div class="mc-cats-label">Pitching</div>
       ${PIT_CATS.map(c => buildCatRow(c, aStats, hStats)).join('')}
-    </div>` : '';
+    </div>` : (hasScore ? '' : `<div style="padding:8px 16px 12px;font-size:11px;color:var(--text3);text-align:center">
+      Category breakdown available after week ends
+    </div>`);
 
     grid.innerHTML += `<div class="matchup-card${you?' is-you':''}">
       <div class="mc-header"><span>WEEK ${period}</span><span class="mc-leading">${leadText}</span></div>
