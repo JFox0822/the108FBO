@@ -126,6 +126,17 @@ if not test or list(test.keys()) == ['error']:
 print(f'Auth test: {list(test.keys())[:6] if test else "failed"}')
 if test and list(test.keys()) != ['error']:
     print(f'  ✅ Authenticated! Sample: {json.dumps(test)[:300]}')
+else:
+    print(f'  ❌ Auth error details: {json.dumps(test)[:400]}')
+    # Try other endpoints to see what works
+    for ep, params in [
+        ('/fxea/general/getScoreboard', {'scoringPeriod': 1}),
+        ('/fxea/general/getMatchupResults', {'scoringPeriod': 1}),
+        ('/fxea/general/getTeamMatchupInfo', {'scoringPeriod': 1}),
+        ('/fxea/general/getStandings', {'scoringPeriod': 1, 'timeframeType': 'BY_PERIOD'}),
+    ]:
+        r2 = get(ep, params)
+        print(f'  {ep.split("/")[-1]}: {json.dumps(r2)[:200]}')
 
 # ── PLAYER ADP ────────────────────────────────────
 print('Fetching player ADP...')
